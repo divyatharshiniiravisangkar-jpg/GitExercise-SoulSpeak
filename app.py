@@ -41,7 +41,7 @@ init_db()
 # ---------------- HOME ----------------
 @app.route("/")
 def home():
-    return render_template("index.html")
+    return render_template('home.html')
 
 # ---------------- REGISTER ----------------
 @app.route("/register", methods=["GET", "POST"])
@@ -67,9 +67,9 @@ def register():
 # ---------------- LOGIN ----------------
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    if request.method == "POST":
-        username = request.form["username"]
-        password = request.form["password"]
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
 
         conn = get_db()
         user = conn.execute(
@@ -85,7 +85,12 @@ def login():
         else:
             return "Invalid login!"
 
-    return render_template("login.html")
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        username = request.form['username']
+        email = request.form['email']
+        password = request.form['password']
 
 # ---------------- DIARY ----------------
 @app.route("/diary", methods=["GET", "POST"])
@@ -125,6 +130,7 @@ def logout():
     session.clear()
     return redirect("/")
 
-# ---------------- RUN ----------------
-if __name__ == "__main__":
+
+
+if __name__ == '__main__':
     app.run(debug=True)
