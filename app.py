@@ -4,7 +4,7 @@ app = Flask("Soul Speak")
 
 @app.route('/')
 def home():
-    return render_template('home.html')
+    return render_template('homepage.html')
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
