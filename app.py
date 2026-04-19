@@ -41,7 +41,7 @@ init_db()
 # ---------------- HOME ----------------
 @app.route("/")
 def home():
-    return render_template('home.html')
+    return render_template('homepage.html')
 
 # ---------------- REGISTER ----------------
 @app.route("/register", methods=["GET", "POST"])
