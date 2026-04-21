@@ -1,46 +1,79 @@
-<h2>Community Chat</h2>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Community Chat</title>
+    <style>
+        body { font-family: sans-serif; max-width: 800px; margin: 20px auto; padding: 0 20px; line-height: 1.6; }
+        .chat-container { border: 1px solid #ddd; padding: 20px; border-radius: 8px; height: 500px; overflow-y: scroll; margin-bottom: 20px; background: #fdfdfd; }
+        .message { border-bottom: 1px solid #eee; padding: 10px 0; position: relative; }
+        .username { font-weight: bold; color: #2c3e50; }
+        .timestamp { font-size: 0.8em; color: #95a5a6; margin-left: 10px; }
+        .reply-quote { font-size: 0.85em; color: #7f8c8d; background: #f1f1f1; padding: 8px; border-left: 4px solid #3498db; margin: 5px 0; border-radius: 4px; }
+        .reply-btn { font-size: 0.75em; cursor: pointer; color: #3498db; background: none; border: none; padding: 0; text-decoration: underline; }
+        
+        /* The "Replying to..." box above the input */
+        #reply-status-box { display: none; background: #e8f4fd; padding: 10px; border-radius: 5px 5px 0 0; border: 1px solid #3498db; border-bottom: none; }
+        .input-area { display: flex; flex-direction: column; }
+        input[type="text"] { padding: 12px; border: 1px solid #ccc; border-radius: 0 0 5px 5px; outline: none; }
+        button[type="submit"] { padding: 10px; background: #3498db; color: white; border: none; cursor: pointer; margin-top: 10px; border-radius: 5px; }
+    </style>
+</head>
+<body>
 
-<div id="reply-preview" style="display:none; background:#f0f0f0; padding:10px; margin-bottom:10px; border-left:5px solid #007bff;">
-    Replying to: <span id="reply-text"></span>
-    <button onclick="cancelReply()">X</button>
-</div>
+    <h2>Community Chat</h2>
+    <p>Logged in as: <strong>{{ session['username'] }}</strong> | <a href="/dashboard">Back to Dashboard</a></p>
 
-<form method="POST">
-    <input type="hidden" name="reply_to" id="reply-id-input">
-    <input type="text" name="message" id="message-field" placeholder="Write a message..." required>
-    <button type="submit">Send</button>
-</form>
+    <div class="chat-container">
+        {% for msg in messages %}
+        <div class="message">
+            <span class="username">{{ msg.username }}</span>
+            <span class="timestamp">{{ msg.date }}</span>
+            
+            {% if msg.replying_to_msg %}
+            <div class="reply-quote">
+                <small>Replying to:</small><br>
+                "{{ msg.replying_to_msg }}"
+            </div>
+            {% endif %}
 
-<hr>
-
-{% for msg in messages %}
-<div style="border-bottom:1px solid #ddd; padding:10px;">
-    <strong>{{ msg.username }}</strong> <small>({{ msg.date }})</small><br>
-    
-    {% if msg.replying_to_msg %}
-    <div style="font-size:0.85em; color:#666; background:#f9f9f9; padding:5px; border-left:2px solid #ccc; margin-bottom:5px;">
-        Replying to: "{{ msg.replying_to_msg }}"
+            <p style="margin: 5px 0;">{{ msg.message }}</p>
+            
+            <button class="reply-btn" onclick="prepareReply('{{ msg.id }}', '{{ msg.message }}', '{{ msg.username }}')">Reply</button>
+        </div>
+        {% endfor %}
     </div>
-    {% endif %}
 
-    <p>{{ msg.message }}</p>
-    
-    <button onclick="prepareReply('{{ msg.id }}', '{{ msg.message }}')">Reply</button>
-</div>
-{% endfor %}
+    <div class="input-area">
+        <div id="reply-status-box">
+            <span>Replying to <strong><span id="reply-to-user"></span></strong>: <i>"<span id="reply-to-text"></span>"</i></span>
+            <button type="button" style="float:right; border:none; background:none; cursor:pointer;" onclick="cancelReply()">[Cancel]</button>
+        </div>
 
-<script>
-function prepareReply(id, text) {
-    document.getElementById('reply-id-input').value = id;
-    document.getElementById('reply-text').innerText = text;
-    document.getElementById('reply-preview').style.display = 'block';
-    document.getElementById('message-field').focus();
-}
+        <form method="POST">
+            <input type="hidden" name="reply_to" id="reply-id-field">
+            
+            <input type="text" name="message" id="message-input" placeholder="Type your message here..." required style="width: 100%; box-sizing: border-box;">
+            <button type="submit" style="width: 100%;">Send Message</button>
+        </form>
+    </div>
 
-function cancelReply() {
-    document.getElementById('reply-id-input').value = '';
-    document.getElementById('reply-preview').style.display = 'none';
-}
-</script>
-<br>
-<a href="/dashboard">Back to Dashboard</a>
+    <script>
+        // This function fills the hidden ID field and shows the preview box
+        function prepareReply(id, text, user) {
+            document.getElementById('reply-id-field').value = id;
+            document.getElementById('reply-to-user').innerText = user;
+            document.getElementById('reply-to-text').innerText = text;
+            document.getElementById('reply-status-box').style.display = 'block';
+            document.getElementById('message-input').focus();
+        }
+
+        // This function clears the reply data if the user clicks [Cancel]
+        function cancelReply() {
+            document.getElementById('reply-id-field').value = '';
+            document.getElementById('reply-status-box').style.display = 'none';
+        }
+    </script>
+
+</body>
+</html>
