@@ -1,36 +1,33 @@
-
 from flask import Flask, render_template, request, redirect, session
 import sqlite3
 
 app = Flask(__name__)
 app.secret_key = "secret123"
 
-# ---------------- DATABASE ----------------
+# -------- DATABASE --------
 def get_db():
-    conn = sqlite3.connect("soulspeak.db")
+    conn = sqlite3.connect("users.db")
     conn.row_factory = sqlite3.Row
     return conn
 
 def init_db():
     conn = get_db()
-
-    # USERS TABLE
+    
+    # Users table
     conn.execute("""
-    CREATE TABLE IF NOT EXISTS users (
+    CREATE TABLE IF NOT EXISTS users(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL
+        username TEXT UNIQUE,
+        password TEXT
     )
     """)
 
-    # DIARY TABLE
+    # Diary table
     conn.execute("""
-    CREATE TABLE IF NOT EXISTS diary (
+    CREATE TABLE IF NOT EXISTS diary(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER,
-        content TEXT NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users(id)
+        user TEXT,
+        content TEXT
     )
     """)
 
@@ -39,12 +36,12 @@ def init_db():
 
 init_db()
 
-# ---------------- HOME ----------------
+# -------- HOME --------
 @app.route("/")
 def home():
-    return render_template('homepage.html')
+    return render_template("index.html")
 
-# ---------------- REGISTER ----------------
+# -------- REGISTER --------
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "POST":
@@ -53,10 +50,7 @@ def register():
 
         conn = get_db()
         try:
-            conn.execute(
-                "INSERT INTO users (username, password) VALUES (?, ?)",
-                (username, password)
-            )
+            conn.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, password))
             conn.commit()
             conn.close()
             return redirect("/login")
@@ -65,13 +59,13 @@ def register():
 
     return render_template("register.html")
 
-# ---------------- LOGIN ----------------
+# -------- LOGIN --------
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
         username = request.form["username"]
         password = request.form["password"]
-        
+
         conn = get_db()
         user = conn.execute(
             "SELECT * FROM users WHERE username=? AND password=?",
@@ -80,52 +74,42 @@ def login():
         conn.close()
 
         if user:
-            session["user_id"] = user["id"]
-            session["username"] = user["username"]
+            session["user"] = username
             return redirect("/diary")
         else:
             return "Invalid login!"
 
     return render_template("login.html")
 
-# ---------------- DIARY ----------------
+# -------- DIARY --------
 @app.route("/diary", methods=["GET", "POST"])
 def diary():
-    if "user_id" not in session:
+    if "user" not in session:
         return redirect("/login")
 
     conn = get_db()
 
-    # SAVE ENTRY
     if request.method == "POST":
         content = request.form["content"]
-
-        conn.execute(
-            "INSERT INTO diary (user_id, content) VALUES (?, ?)",
-            (session["user_id"], content)
-        )
+        conn.execute("INSERT INTO diary (user, content) VALUES (?, ?)", (session["user"], content))
         conn.commit()
 
-    # GET ENTRIES
+    # Fetch user diary entries
     entries = conn.execute(
-        "SELECT content, created_at FROM diary WHERE user_id=? ORDER BY id DESC",
-        (session["user_id"],)
+        "SELECT content FROM diary WHERE user=?",
+        (session["user"],)
     ).fetchall()
 
     conn.close()
 
-    return render_template(
-        "diary.html",
-        user=session["username"],
-        entries=entries
-    )
+    return render_template("diary.html", user=session["user"], entries=entries)
 
-# ---------------- LOGOUT ----------------
+# -------- LOGOUT --------
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect("/")
 
-# ---------------- RUN ----------------
+# -------- RUN --------
 if __name__ == "__main__":
     app.run(debug=True)
