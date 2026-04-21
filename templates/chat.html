@@ -1,0 +1,9 @@
+<h2>Chat Room</h2>
+<form method="POST">
+    <input type="text" name="message" placeholder="Say something...">
+    <button type="submit">Send</button>
+</form>
+{% for msg in messages %}
+    <p>[{{ msg[1] }}] {{ msg[0] }}</p>
+{% endfor %}
+<a href="/dashboard">Back</a>
