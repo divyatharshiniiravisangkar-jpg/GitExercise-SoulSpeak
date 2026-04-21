@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 from flask import Flask, render_template, request, redirect, session
 import sqlite3
 
@@ -50,8 +50,6 @@ app = Flask("Soul Speak")
 >>>>>>> f42508935373f9b300753a1f5d0a4b79a68569f6
 def home():
     return render_template('homepage.html')
-
-<<<<<<< HEAD
 # ---------------- REGISTER ----------------
 @app.route("/register", methods=["GET", "POST"])
 def register():
@@ -82,8 +80,6 @@ def login():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-
-<<<<<<< HEAD
         conn = get_db()
         user = conn.execute(
             "SELECT * FROM users WHERE username=? AND password=?",
