@@ -110,8 +110,6 @@ def register():
         username = request.form['username']
         email = request.form['email']
         password = request.form['password']
-
-<<<<<<< HEAD
 # ---------------- DIARY ----------------
 @app.route("/diary", methods=["GET", "POST"])
 def diary():
