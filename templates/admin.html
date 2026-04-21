@@ -1,0 +1,12 @@
+<h1>Admin Panel - All Chats</h1>
+<table>
+    <tr><th>User</th><th>Message</th><th>Sentiment</th><th>Date</th></tr>
+    {% for chat in chats %}
+    <tr>
+        <td>{{ chat.username }}</td>
+        <td>{{ chat.message }}</td>
+        <td>{{ chat.sentiment_polarity }}</td>
+        <td>{{ chat.date }}</td>
+    </tr>
+    {% endfor %}
+</table>
