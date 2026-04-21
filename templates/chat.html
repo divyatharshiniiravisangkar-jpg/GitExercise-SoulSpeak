@@ -1,9 +1,46 @@
-<h2>Chat Room</h2>
+<h2>Community Chat</h2>
+
+<div id="reply-preview" style="display:none; background:#f0f0f0; padding:10px; margin-bottom:10px; border-left:5px solid #007bff;">
+    Replying to: <span id="reply-text"></span>
+    <button onclick="cancelReply()">X</button>
+</div>
+
 <form method="POST">
-    <input type="text" name="message" placeholder="Say something...">
+    <input type="hidden" name="reply_to" id="reply-id-input">
+    <input type="text" name="message" id="message-field" placeholder="Write a message..." required>
     <button type="submit">Send</button>
 </form>
+
+<hr>
+
 {% for msg in messages %}
-    <p>[{{ msg[1] }}] {{ msg[0] }}</p>
+<div style="border-bottom:1px solid #ddd; padding:10px;">
+    <strong>{{ msg.username }}</strong> <small>({{ msg.date }})</small><br>
+    
+    {% if msg.replying_to_msg %}
+    <div style="font-size:0.85em; color:#666; background:#f9f9f9; padding:5px; border-left:2px solid #ccc; margin-bottom:5px;">
+        Replying to: "{{ msg.replying_to_msg }}"
+    </div>
+    {% endif %}
+
+    <p>{{ msg.message }}</p>
+    
+    <button onclick="prepareReply('{{ msg.id }}', '{{ msg.message }}')">Reply</button>
+</div>
 {% endfor %}
-<a href="/dashboard">Back</a>
+
+<script>
+function prepareReply(id, text) {
+    document.getElementById('reply-id-input').value = id;
+    document.getElementById('reply-text').innerText = text;
+    document.getElementById('reply-preview').style.display = 'block';
+    document.getElementById('message-field').focus();
+}
+
+function cancelReply() {
+    document.getElementById('reply-id-input').value = '';
+    document.getElementById('reply-preview').style.display = 'none';
+}
+</script>
+<br>
+<a href="/dashboard">Back to Dashboard</a>
