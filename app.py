@@ -1,19 +1,35 @@
-from flask import Flask, render_template, request, redirect, url_for, session
+from flask import Flask, render_template, request, redirect, session
 import sqlite3
 
 app = Flask(__name__)
-app.secret_key = "secretkey"
+app.secret_key = "secret123"
 
 # ---------------- DATABASE ----------------
-def init_db():
-    conn = sqlite3.connect("users.db")
-    cursor = conn.cursor()
+def get_db():
+    conn = sqlite3.connect("soulspeak.db")
+    conn.row_factory = sqlite3.Row
+    return conn
 
-    cursor.execute("""
+def init_db():
+    conn = get_db()
+
+    # USERS TABLE
+    conn.execute("""
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT UNIQUE,
-        password TEXT
+        username TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL
+    )
+    """)
+
+    # DIARY TABLE
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS diary (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        content TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id)
     )
     """)
 
@@ -34,15 +50,17 @@ def register():
         username = request.form["username"]
         password = request.form["password"]
 
-        conn = sqlite3.connect("users.db")
-        cursor = conn.cursor()
-
+        conn = get_db()
         try:
-            cursor.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, password))
+            conn.execute(
+                "INSERT INTO users (username, password) VALUES (?, ?)",
+                (username, password)
+            )
             conn.commit()
-            return redirect(url_for("login"))
+            conn.close()
+            return redirect("/login")
         except:
-            return "User already exists!"
+            return "Username already exists!"
 
     return render_template("register.html")
 
@@ -53,32 +71,59 @@ def login():
         username = request.form["username"]
         password = request.form["password"]
 
-        conn = sqlite3.connect("users.db")
-        cursor = conn.cursor()
-
-        cursor.execute("SELECT * FROM users WHERE username=? AND password=?", (username, password))
-        user = cursor.fetchone()
+        conn = get_db()
+        user = conn.execute(
+            "SELECT * FROM users WHERE username=? AND password=?",
+            (username, password)
+        ).fetchone()
+        conn.close()
 
         if user:
-            session["user"] = username
-            return redirect(url_for("dashboard"))
+            session["user_id"] = user["id"]
+            session["username"] = user["username"]
+            return redirect("/diary")
         else:
-            return "Invalid credentials!"
+            return "Invalid login!"
 
     return render_template("login.html")
 
-# ---------------- DASHBOARD ----------------
-@app.route("/dashboard")
-def dashboard():
-    if "user" in session:
-        return render_template("dashboard.html", user=session["user"])
-    return redirect(url_for("login"))
+# ---------------- DIARY ----------------
+@app.route("/diary", methods=["GET", "POST"])
+def diary():
+    if "user_id" not in session:
+        return redirect("/login")
+
+    conn = get_db()
+
+    # SAVE ENTRY
+    if request.method == "POST":
+        content = request.form["content"]
+
+        conn.execute(
+            "INSERT INTO diary (user_id, content) VALUES (?, ?)",
+            (session["user_id"], content)
+        )
+        conn.commit()
+
+    # GET ENTRIES
+    entries = conn.execute(
+        "SELECT content, created_at FROM diary WHERE user_id=? ORDER BY id DESC",
+        (session["user_id"],)
+    ).fetchall()
+
+    conn.close()
+
+    return render_template(
+        "diary.html",
+        user=session["username"],
+        entries=entries
+    )
 
 # ---------------- LOGOUT ----------------
 @app.route("/logout")
 def logout():
-    session.pop("user", None)
-    return redirect(url_for("home"))
+    session.clear()
+    return redirect("/")
 
 # ---------------- RUN ----------------
 if __name__ == "__main__":
