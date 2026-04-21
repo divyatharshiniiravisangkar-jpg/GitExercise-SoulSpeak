@@ -41,15 +41,9 @@ init_db()
 
 # ---------------- HOME ----------------
 @app.route("/")
-=======
-from flask import Flask, render_template, request
-
-app = Flask("Soul Speak")
-
-@app.route('/')
->>>>>>> f42508935373f9b300753a1f5d0a4b79a68569f6
 def home():
     return render_template('homepage.html')
+
 # ---------------- REGISTER ----------------
 @app.route("/register", methods=["GET", "POST"])
 def register():
@@ -73,13 +67,11 @@ def register():
 
 # ---------------- LOGIN ----------------
 @app.route("/login", methods=["GET", "POST"])
-=======
-@app.route('/login', methods=['GET', 'POST'])
->>>>>>> f42508935373f9b300753a1f5d0a4b79a68569f6
 def login():
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
+    if request.method == "POST":
+        username = request.form["username"]
+        password = request.form["password"]
+        
         conn = get_db()
         user = conn.execute(
             "SELECT * FROM users WHERE username=? AND password=?",
@@ -93,19 +85,9 @@ def login():
             return redirect("/diary")
         else:
             return "Invalid login!"
-=======
-        return f"Login received: {username}"
 
-    return render_template('login.html')
+    return render_template("login.html")
 
->>>>>>> f42508935373f9b300753a1f5d0a4b79a68569f6
-
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    if request.method == 'POST':
-        username = request.form['username']
-        email = request.form['email']
-        password = request.form['password']
 # ---------------- DIARY ----------------
 @app.route("/diary", methods=["GET", "POST"])
 def diary():
@@ -146,13 +128,4 @@ def logout():
 
 # ---------------- RUN ----------------
 if __name__ == "__main__":
-=======
-        return f"Registered: {username}"
-
-    return render_template('register.html')
-
-
-
-if __name__ == '__main__':
->>>>>>> f42508935373f9b300753a1f5d0a4b79a68569f6
     app.run(debug=True)
