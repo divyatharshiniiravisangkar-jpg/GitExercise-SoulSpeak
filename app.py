@@ -105,15 +105,19 @@ def login():
 def chat():
     if 'user_id' not in session: return redirect(url_for('login'))
     db = get_db()
+    
     if request.method == 'POST':
         msg = request.form.get('message')
-        reply_id = request.form.get('reply_to') # This captures the ID of the msg being replied to
+        reply_id = request.form.get('reply_to')
         pol, _ = analyze_mood(msg)
+        
         db.execute("INSERT INTO chat (user_id, message, sentiment_polarity, reply_to) VALUES (?, ?, ?, ?)", 
                    (session['user_id'], msg, pol, reply_id))
         db.commit()
+        # --- ADD THIS LINE ---
+        return redirect(url_for('chat')) 
     
-    # Get messages and join with usernames
+    # This part only runs on GET (when the page loads normally)
     messages = db.execute('''
         SELECT chat.*, users.username FROM chat 
         JOIN users ON chat.user_id = users.id 
