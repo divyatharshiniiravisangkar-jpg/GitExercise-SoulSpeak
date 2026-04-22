@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Share Your Feelings</title>
+</head>
+<body>
+
+<h2>Express Yourself (Anonymous)</h2>
+
+<form method="POST">
+    <textarea name="content" rows="6" cols="50" placeholder="Write your thoughts..." required></textarea><br><br>
+
+    Select Mood:<br>
+    <select name="mood">
+        <option value="happy">Happy</option>
+        <option value="sad">Sad</option>
+        <option value="angry">Angry</option>
+        <option value="stressed">Stressed</option>
+        <option value="neutral">Neutral</option>
+    </select><br><br>
+
+    <input type="submit" value="Submit">
+</form>
+
+<hr>
+
+<h3>Sentiment Result</h3>
+<p>Polarity Score: {{ polarity }}</p>
+<p>Sentiment: {{ sentiment }}</p>
+
+<h3>Personalized Suggestions</h3>
+<ul>
+    <li>{{ suggestion1 }}</li>
+    <li>{{ suggestion2 }}</li>
+    <li>{{ suggestion3 }}</li>
+</ul>
+
+</body>
+</html>

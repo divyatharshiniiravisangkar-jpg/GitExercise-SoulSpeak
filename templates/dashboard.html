@@ -1,13 +1,39 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Dashboard</title>
+    <title>Mood Dashboard</title>
 </head>
 <body>
-    <h2>Welcome, {{ user }} 🎉</h2>
 
-    <p>Login successful!</p>
+<h2>Mood Tracking Dashboard</h2>
 
-    <a href="/logout">Logout</a>
+<h3>Current Mood</h3>
+<p>
+    {% if current_mood == "happy" %}
+        😊 Happy
+    {% elif current_mood == "sad" %}
+        😢 Sad
+    {% elif current_mood == "angry" %}
+        😡 Angry
+    {% elif current_mood == "stressed" %}
+        😰 Stressed
+    {% else %}
+        😐 Neutral
+    {% endif %}
+</p>
+
+<hr>
+
+<h3>Sentiment Overview (Percentage)</h3>
+
+<p>😊 Positive: {{ positive_percent }}%</p>
+<p>😢 Negative: {{ negative_percent }}%</p>
+<p>😐 Neutral: {{ neutral_percent }}%</p>
+
+<hr>
+
+<h3>Progress Tracking</h3>
+<p>Total Entries: {{ total_entries }}</p>
+
 </body>
 </html>

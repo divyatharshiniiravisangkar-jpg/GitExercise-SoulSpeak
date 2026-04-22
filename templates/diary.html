@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Personal Diary</title>
+</head>
+<body>
+
+<h2>My Private Diary</h2>
+<p>This is your personal space. Only you can see these entries.</p>
+
+<hr>
+
+<h3>Write a New Entry</h3>
+<form method="POST">
+    <textarea name="diary_entry" rows="6" cols="50" placeholder="Write your thoughts here..." required></textarea>
+    <br><br>
+    <input type="submit" value="Save Entry">
+</form>
+
+<hr>
+
+<h3>Your Previous Entries</h3>
+
+{% if entries %}
+    {% for entry in entries %}
+        <p><strong>Date:</strong> {{ entry.date }}</p>
+        <p>{{ entry.text }}</p>
+        <hr>
+    {% endfor %}
+{% else %}
+    <p>No diary entries yet.</p>
+{% endif %}
+
+</body>
+</html>

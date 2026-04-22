@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Dashboard</title>
+</head>
+<body>
+
+<h1>Admin Dashboard</h1>
+
+<p>Welcome, Admin</p>
+
+<hr>
+
+<!-- 📊 SYSTEM SUMMARY -->
+<h2>System Overview</h2>
+<p>Total Users: {{ total_users }}</p>
+<p>Total Posts: {{ total_posts }}</p>
+
+<hr>
+
+<!-- 🔍 SEARCH USERS -->
+<h2>Search User</h2>
+<form method="GET" action="/search_user">
+    <input type="text" name="username" placeholder="Enter username">
+    <input type="submit" value="Search">
+</form>
+
+<hr>
+
+<!-- 👤 USERS TABLE -->
+<h2>Users</h2>
+
+{% if users %}
+<table border="1" cellpadding="10">
+    <tr>
+        <th>ID</th>
+        <th>Username</th>
+        <th>Action</th>
+    </tr>
+
+    {% for user in users %}
+    <tr>
+        <td>{{ user.id }}</td>
+        <td>{{ user.username }}</td>
+        <td>
+            <form method="POST" action="/delete_user/{{ user.id }}">
+                <button type="submit">Delete User</button>
+            </form>
+        </td>
+    </tr>
+    {% endfor %}
+</table>
+{% else %}
+<p>No users found.</p>
+{% endif %}
+
+<hr>
+
+<!-- 📝 POSTS SECTION -->
+<h2>Posts</h2>
+
+{% if posts %}
+    {% for post in posts %}
+        
+        <p><strong>Post ID:</strong> {{ post.id }}</p>
+        <p><strong>Content:</strong> {{ post.content }}</p>
+
+        <p><strong>Sentiment:</strong>
+            {% if post.sentiment == "positive" %}
+                😊 Positive
+            {% elif post.sentiment == "negative" %}
+                😢 Negative
+            {% else %}
+                😐 Neutral
+            {% endif %}
+        </p>
+
+        <!-- DELETE POST -->
+        <form method="POST" action="/delete_post/{{ post.id }}">
+            <button type="submit">Delete Post</button>
+        </form>
+
+        <hr>
+
+    {% endfor %}
+{% else %}
+    <p>No posts available.</p>
+{% endif %}
+
+<hr>
+
+<!-- 🚪 LOGOUT -->
+<form action="/admin_logout" method="GET">
+    <input type="submit" value="Logout">
+</form>
+
+</body>
+</html>

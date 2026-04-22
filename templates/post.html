@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Create Post</title>
+</head>
+<body>
+
+<h2>Anonymous Posting</h2>
+
+<h3>Create Post</h3>
+
+<form method="POST">
+    
+    <p><strong>Share your thoughts:</strong></p>
+    <textarea name="content" rows="6" cols="50" placeholder="Write your thoughts here..." required></textarea>
+    
+    <br><br>
+    
+    <input type="submit" value="Submit">
+
+</form>
+
+<hr>
+
+<h3>Sentiment Result</h3>
+
+<p>
+    {% if sentiment == "positive" %}
+        😊 Positive
+    {% elif sentiment == "negative" %}
+        😢 Negative
+    {% else %}
+        😐 Neutral
+    {% endif %}
+</p>
+
+</body>
+</html>
