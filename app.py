@@ -1,10 +1,12 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, redirect, session
 
 app = Flask("Soul Speak")
 
+app.secret_key = 'your_secret_key_here'
+
 @app.route('/')
 def home():
-    return render_template('homepage.html')
+    return render_template('home.html')
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -12,7 +14,10 @@ def login():
         username = request.form['username']
         password = request.form['password']
 
-        return f"Login received: {username}"
+        # Simple check
+        if username and password:
+            session['username'] = username
+            return redirect('/')
 
     return render_template('login.html')
 
@@ -27,6 +32,21 @@ def register():
         return f"Registered: {username}"
 
     return render_template('register.html')
+
+
+@app.route('/diary')
+def diary():
+    return render_template('diary.html')
+
+
+@app.route('/journal')
+def journal():
+    return render_template('journal.html')
+
+
+@app.route('/chat')
+def chat():
+    return render_template('chat.html')
 
 
 @app.route('/admin_login', methods=['GET', 'POST'])
@@ -84,6 +104,12 @@ def delete_post(post_id):
 @app.route('/admin_logout')
 def admin_logout():
     return "Logged out"
+
+
+@app.route('/logout')
+def logout():
+    session.pop('username', None)
+    return redirect('/')
 
 
 if __name__ == '__main__':
