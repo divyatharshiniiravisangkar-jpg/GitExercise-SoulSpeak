@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Login</title>
+</head>
+<body>
+
+<h2>Admin Login</h2>
+
+<p>Only authorized admin can access this page.</p>
+
+<hr>
+
+<form method="POST" action="/admin_login">
+    
+    <label>Admin Username:</label><br>
+    <input type="text" name="username" required>
+    
+    <br><br>
+    
+    <label>Password:</label><br>
+    <input type="password" name="password" required>
+    
+    <br><br>
+    
+    <input type="submit" value="Login">
+
+</form>
+
+<br>
+
+<p>
+    <a href="/admin_forgot_password">Forgot Password?</a>
+</p>
+
+<hr>
+
+<p><a href="/">Back to Home</a></p>
+
+</body>
+</html>
