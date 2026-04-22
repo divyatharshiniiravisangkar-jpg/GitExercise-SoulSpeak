@@ -41,7 +41,7 @@ init_db()
 # ---------------- HOME ----------------
 @app.route("/")
 def home():
-    return render_template('homepage.html')
+    return render_template('home.html')
 
 # ---------------- REGISTER ----------------
 @app.route("/register", methods=["GET", "POST"])
@@ -131,6 +131,21 @@ def logout():
     return redirect("/")
 
 
+@app.route('/diary')
+def diary():
+    return render_template('diary.html')
+
+
+@app.route('/journal')
+def journal():
+    return render_template('journal.html')
+
+
+@app.route('/chat')
+def chat():
+    return render_template('chat.html')
+
+
 @app.route('/admin_login', methods=['GET', 'POST'])
 def admin_login():
     if request.method == 'POST':
@@ -186,6 +201,12 @@ def delete_post(post_id):
 @app.route('/admin_logout')
 def admin_logout():
     return "Logged out"
+
+
+@app.route('/logout')
+def logout():
+    session.pop('username', None)
+    return redirect('/')
 
 
 if __name__ == '__main__':
