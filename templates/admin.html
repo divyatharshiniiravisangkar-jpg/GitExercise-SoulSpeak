@@ -1,10 +1,102 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Admin</title>
-</head>
-<body>
-<h2>Admin</h2>
-<p>Admin page.</p>
-</body>
-</html>
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard{% endblock %}
+
+{% block content %}
+<section class="panel" style="margin-bottom: 22px;">
+    <div class="meta-row">
+        <div>
+            <p class="feature-meta">Admin controls</p>
+            <h1 class="page-title" style="margin-bottom: 8px;">Admin Dashboard</h1>
+            <p class="lead">Search users, review anonymous posts, and manage the platform.</p>
+        </div>
+        <a class="button secondary" href="{{ url_for('admin_logout') }}">Logout</a>
+    </div>
+    <div class="stats">
+        <div class="stat">
+            <span class="stat-label">Visible Users</span>
+            <span class="stat-value">{{ total_users }}</span>
+        </div>
+        <div class="stat">
+            <span class="stat-label">Anonymous Posts</span>
+            <span class="stat-value">{{ total_posts }}</span>
+        </div>
+    </div>
+</section>
+
+<section class="panel" style="margin-bottom: 22px;">
+    <p class="feature-meta">Search user</p>
+    <form method="GET" action="{{ url_for('search_user') }}" style="grid-template-columns: 1fr auto;">
+        <input type="text" name="username" value="{{ search_query }}" placeholder="Enter username">
+        <button type="submit">Search</button>
+    </form>
+</section>
+
+<section class="two-col">
+    <div class="panel">
+        <p class="feature-meta">Users</p>
+        {% if users %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Username</th>
+                        <th>Email</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr>
+                        <td>{{ user.id }}</td>
+                        <td>{{ user.username }}</td>
+                        <td>{{ user.email or "-" }}</td>
+                        <td>
+                            {% if user.username != "admin" %}
+                            <form class="inline-form" method="POST" action="{{ url_for('delete_user', user_id=user.id) }}">
+                                <button type="submit" class="button danger">Delete User</button>
+                            </form>
+                            {% else %}
+                            <span class="muted">Protected</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="lead">No users found.</p>
+        {% endif %}
+    </div>
+
+    <div class="panel">
+        <p class="feature-meta">Posts</p>
+        {% if posts %}
+        <div class="entry-list">
+            {% for post in posts %}
+            <div class="entry-card">
+                <div class="meta-row">
+                    <strong>Post #{{ post.id }}</strong>
+                    <span>{{ post.created_at }}</span>
+                </div>
+                <p style="margin: 0 0 12px; line-height: 1.7;">{{ post.content }}</p>
+                <div class="meta-row">
+                    <span class="badge {{ post.sentiment }}">
+                        {% if post.sentiment == "positive" %}Positive{% elif post.sentiment == "negative" %}Negative{% else %}Neutral{% endif %}
+                    </span>
+                    <span class="muted">Mood: {{ post.mood|title }}</span>
+                </div>
+                <form class="inline-form" method="POST" action="{{ url_for('delete_post', post_id=post.id) }}">
+                    <button type="submit" class="button danger">Delete Post</button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="lead">No posts available.</p>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

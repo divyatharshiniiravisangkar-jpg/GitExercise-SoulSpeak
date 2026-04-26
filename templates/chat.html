@@ -1,111 +1,73 @@
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SoulSpeak - Community Chat</title>
-    <style>
-        body { font-family: 'Segoe UI', sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; }
-        .chat-container { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
-        
-        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 20px; }
-        .back-link { text-decoration: none; color: #3498db; font-weight: bold; }
+{% extends "base.html" %}
 
-        /* Message Styles */
-        .message-list { height: 450px; overflow-y: auto; border: 1px solid #eee; padding: 15px; border-radius: 8px; margin-bottom: 20px; background: #fafafa; }
-        .message-item { background: white; padding: 12px; border-radius: 8px; margin-bottom: 15px; border-left: 5px solid #3498db; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        
-        .user-name { font-weight: bold; color: #2c3e50; font-size: 0.9rem; }
-        .timestamp { font-size: 0.75rem; color: #999; margin-left: 10px; }
-        .msg-text { margin: 8px 0; color: #444; word-wrap: break-word; }
-        
-        /* Reply Quote Box */
-        .reply-quote { background: #eef7fd; border-left: 3px solid #3498db; padding: 8px 12px; margin: 5px 0 10px 0; font-size: 0.85rem; border-radius: 4px; color: #555; font-style: italic; }
+{% block title %}Chat Support{% endblock %}
 
-        /* Sentiment Badges */
-        .sentiment-badge { padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; color: white; margin-right: 10px; }
-        .pos { background: #2ecc71; } .neu { background: #95a5a6; } .neg { background: #e74c3c; }
+{% block content %}
+<section class="two-col">
+    <div class="panel">
+        <p class="feature-meta">Community support</p>
+        <h1 class="page-title">Chat Support</h1>
+        <p class="lead">Talk with others, reply to messages, and share how you feel in a calm space.</p>
 
-        .reply-btn { background: none; border: none; color: #3498db; cursor: pointer; font-size: 0.8rem; text-decoration: underline; padding: 0; }
-
-        /* Input Form Area */
-        .input-area { background: #fff; padding: 15px; border-top: 1px solid #eee; }
-        #reply-status-box { display: none; background: #d1ecf1; padding: 10px; border-radius: 5px; font-size: 0.85rem; margin-bottom: 10px; }
-        
-        textarea { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; resize: none; font-family: inherit; box-sizing: border-box; }
-        .send-btn { width: 100%; background: #3498db; color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 10px; transition: 0.3s; }
-        .send-btn:hover { background: #2980b9; }
-    </style>
-</head>
-<body>
-
-<div class="chat-container">
-    <div class="header">
-        <a href="{{ url_for('home') }}" class="back-link">← Back to Dashboard</a>
-        <h2>Community Chat</h2>
-        <span>Logged in as: <strong>{{ session['username'] }}</strong></span>
-    </div>
-
-    <div class="message-list">
-        {% for msg in messages %}
-        <div class="message-item">
-            <div style="display: flex; justify-content: space-between;">
-                <span class="user-name">@{{ msg.username }}</span>
-                <span class="timestamp">{{ msg.date }}</span>
-            </div>
-            
-            {% if msg.replying_to_msg %}
-            <div class="reply-quote">
-                <small>Replying to:</small><br>
-                "{{ msg.replying_to_msg }}"
-            </div>
-            {% endif %}
-
-            <p class="msg-text">{{ msg.message }}</p>
-            
-            <div style="display: flex; align-items: center; margin-top: 5px;">
-                <span class="sentiment-badge {% if msg.sentiment_polarity > 0.1 %}pos{% elif msg.sentiment_polarity < -0.1 %}neg{% else %}neu{% endif %}">
-                    AI Sentiment: {{ msg.sentiment_polarity }}
-                </span>
-                
-                <button class="reply-btn" onclick="prepareReply('{{ msg.id }}', '{{ msg.message }}', '{{ msg.username }}')">Reply</button>
-            </div>
-        </div>
-        {% endfor %}
-    </div>
-
-    <div class="input-area">
-        <div id="reply-status-box">
-            <span>Replying to <strong><span id="reply-to-user"></span></strong>: <i>"<span id="reply-to-text"></span>"</i></span>
-            <button type="button" style="float:right; border:none; background:none; cursor:pointer; color:red;" onclick="cancelReply()">[Cancel]</button>
-        </div>
-        
-        <form method="POST" action="{{ url_for('chat') }}">
+        <form method="POST" action="{{ url_for('chat') }}" style="margin-top: 24px;">
             <input type="hidden" name="reply_to" id="reply-id-field">
-            
-            <textarea name="message" id="message-input" rows="3" placeholder="Type your message here..." required></textarea>
-            <button type="submit" class="send-btn">Send Message</button>
+            <div id="reply-status-box" class="reply-box" style="display: none;">
+                Replying to <strong id="reply-to-user"></strong>: "<span id="reply-to-text"></span>"
+                <button type="button" class="button secondary" style="margin-top: 12px;" onclick="cancelReply()">Cancel Reply</button>
+            </div>
+            <div>
+                <label for="message-input">Message</label>
+                <textarea id="message-input" name="message" placeholder="Type your message here..." required></textarea>
+            </div>
+            <button type="submit">Send Message</button>
         </form>
     </div>
-</div>
 
+    <div class="panel">
+        <p class="feature-meta">Recent messages</p>
+        {% if messages %}
+        <div class="message-list">
+            {% for msg in messages %}
+            <div class="message-card">
+                <div class="meta-row">
+                    <strong>@{{ msg.username }}</strong>
+                    <span>{{ msg.created_at }}</span>
+                </div>
+                {% if msg.replying_to_msg %}
+                <div class="reply-box" style="margin-bottom: 12px;">
+                    Replying to: "{{ msg.replying_to_msg }}"
+                </div>
+                {% endif %}
+                <p style="margin: 0 0 14px; line-height: 1.7;">{{ msg.message }}</p>
+                <div class="meta-row">
+                    <span class="badge {% if msg.sentiment_polarity > 0.1 %}positive{% elif msg.sentiment_polarity < -0.1 %}negative{% else %}neutral{% endif %}">
+                        Sentiment {{ msg.sentiment_polarity }}
+                    </span>
+                    <button type="button" class="button secondary" onclick="prepareReply('{{ msg.id }}', {{ msg.message|tojson }}, '{{ msg.username }}')">Reply</button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="lead">No messages yet. Start the conversation.</p>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
 <script>
-    // Fills the hidden ID field and shows the "Replying to..." preview box
-    function prepareReply(id, text, user) {
-        document.getElementById('reply-id-field').value = id;
-        document.getElementById('reply-to-user').innerText = "@" + user;
-        document.getElementById('reply-to-text').innerText = text.substring(0, 50) + (text.length > 50 ? '...' : '');
-        document.getElementById('reply-status-box').style.display = 'block';
-        document.getElementById('message-input').placeholder = "Write your reply...";
-        document.getElementById('message-input').focus();
-    }
+function prepareReply(id, text, user) {
+    document.getElementById("reply-id-field").value = id;
+    document.getElementById("reply-to-user").innerText = "@" + user;
+    document.getElementById("reply-to-text").innerText = text.length > 80 ? text.slice(0, 80) + "..." : text;
+    document.getElementById("reply-status-box").style.display = "block";
+    document.getElementById("message-input").focus();
+}
 
-    // Clears the reply data and hides the preview box
-    function cancelReply() {
-        document.getElementById('reply-id-field').value = '';
-        document.getElementById('reply-status-box').style.display = 'none';
-        document.getElementById('message-input').placeholder = "Type your message here...";
-    }
+function cancelReply() {
+    document.getElementById("reply-id-field").value = "";
+    document.getElementById("reply-status-box").style.display = "none";
+}
 </script>
-
-</body>
-</html>
+{% endblock %}

@@ -1,10 +1,40 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Diary</title>
-</head>
-<body>
-<h2>Diary</h2>
-<p>Your personal diary entries.</p>
-</body>
-</html>
+{% extends "base.html" %}
+
+{% block title %}Private Diary{% endblock %}
+
+{% block content %}
+<section class="two-col">
+    <div class="panel">
+        <p class="feature-meta">Your private space</p>
+        <h1 class="page-title">My Private Diary</h1>
+        <p class="lead">Only you can see these entries. Use this space for reflection, release, and honesty.</p>
+
+        <form method="POST" action="{{ url_for('diary') }}" style="margin-top: 24px;">
+            <div>
+                <label for="entry">Write a new entry</label>
+                <textarea id="entry" name="entry" placeholder="Write your thoughts here..." required></textarea>
+            </div>
+            <button type="submit">Save Entry</button>
+        </form>
+    </div>
+
+    <div class="panel">
+        <p class="feature-meta">Previous entries</p>
+        {% if entries %}
+        <div class="entry-list">
+            {% for entry in entries %}
+            <div class="entry-card">
+                <div class="meta-row">
+                    <strong>Entry #{{ entry.id }}</strong>
+                    <span>{{ entry.created_at }}</span>
+                </div>
+                <p style="margin: 0; line-height: 1.7;">{{ entry.text }}</p>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="lead">No diary entries yet.</p>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}
