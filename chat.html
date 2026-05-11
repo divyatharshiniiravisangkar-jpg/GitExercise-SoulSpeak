@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Chat Room{% endblock %}
+
+{% block content %}
+    <h1>Community Chat</h1>
+
+    <nav>
+        <a href="{{ url_for('dashboard') }}">Dashboard</a> |
+        <a href="{{ url_for('diary') }}">Diary</a> |
+        {% if user.lower() == 'admin' %}
+            <a href="{{ url_for('database_view') }}">Database</a> |
+        {% endif %}
+        <a href="{{ url_for('logout') }}">Logout</a>
+    </nav>
+
+    <p>Logged in as <strong>{{ user }}</strong>.</p>
+
+    <div class="chat-box">
+        {% for msg in messages %}
+            <div class="message {% if msg.sender.lower() == 'admin' %}admin{% endif %}">
+                <strong>{{ msg.sender }}</strong>
+                <div>{{ msg.message }}</div>
+            </div>
+
+            {% if user.lower() == 'admin' %}
+                <form method="POST" class="reply-form">
+                    <input type="hidden" name="reply_to" value="{{ msg.id }}">
+                    <input type="text" name="reply_message" placeholder="Reply to {{ msg.sender }}" required>
+                    <button type="submit">Reply</button>
+                </form>
+            {% endif %}
+        {% endfor %}
+    </div>
+
+    <form method="POST" class="send-form">
+        <input type="text" name="message" placeholder="Type a message to the chat..." required>
+        <button type="submit">Send Message</button>
+    </form>
+
+    {% if user.lower() == 'admin' %}
+        <p class="note">As admin, your replies are sent as <strong>Admin</strong>.</p>
+    {% endif %}
+{% endblock %}

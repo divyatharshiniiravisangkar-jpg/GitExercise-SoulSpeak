@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+    <h2>Welcome, {{ user }}</h2>
+
+    <nav>
+        <a href="{{ url_for('dashboard') }}">Dashboard</a> |
+        <a href="{{ url_for('chat') }}">Chat</a> |
+        <a href="{{ url_for('diary') }}">Diary</a> |
+        {% if user.lower() == 'admin' %}
+            <a href="{{ url_for('database_view') }}">Database</a> |
+        {% endif %}
+        <a href="{{ url_for('logout') }}">Logout</a>
+    </nav>
+
+    <hr>
+
+    {% if posts %}
+        <h3>Recent Posts</h3>
+        <ul>
+            {% for post in posts %}
+                <li>{{ post.content }}</li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>No posts yet.</p>
+    {% endif %}
+{% endblock %}

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}Diary{% endblock %}
+
+{% block content %}
+    <h1>Personal Diary</h1>
+
+    <nav>
+        <a href="{{ url_for('dashboard') }}">Dashboard</a> |
+        <a href="{{ url_for('chat') }}">Chat</a> |
+        {% if user.lower() == 'admin' %}
+            <a href="{{ url_for('database_view') }}">Database</a> |
+        {% endif %}
+        <a href="{{ url_for('logout') }}">Logout</a>
+    </nav>
+
+    <form method="POST" class="diary-form">
+        <textarea name="content" rows="6" placeholder="Write your diary entry..." required></textarea>
+        <button type="submit">Save Entry</button>
+    </form>
+
+    <h2>Diary Entries</h2>
+
+    {% if entries %}
+        <div class="entries">
+            {% for entry in entries %}
+                <article class="entry-card">
+                    <div class="entry-meta">Posted on {{ entry.date.strftime('%Y-%m-%d %H:%M') if entry.date else 'Unknown' }}</div>
+                    <p>{{ entry.content }}</p>
+                </article>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p>You have no diary entries yet.</p>
+    {% endif %}
+{% endblock %}
