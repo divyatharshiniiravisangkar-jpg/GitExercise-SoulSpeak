@@ -11,12 +11,15 @@ from flask import url_for
 from flask import flash
 
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import inspect, text
 
 from flask_login import LoginManager
 from flask_login import UserMixin
 from flask_login import login_user
 from flask_login import logout_user
 from flask_login import login_required
+import os
+
 from flask_login import current_user
 
 from datetime import datetime
@@ -25,11 +28,13 @@ from datetime import datetime
 # FLASK CONFIGURATION
 # ==========================================
 
-app = Flask(__name__)
+app = Flask(__name__, instance_relative_config=True)
 
 app.config['SECRET_KEY'] = 'soulspeaksecret'
 
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
+os.makedirs(app.instance_path, exist_ok=True)
+app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(app.instance_path, 'database.db')}"
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
@@ -129,6 +134,41 @@ class Chat(db.Model):
         nullable=False
     )
 
+    user_id = db.Column(
+        db.Integer,
+        db.ForeignKey('user.id')
+    )
+
+    recipient = db.Column(
+        db.String(100),
+        nullable=False,
+        default='Admin'
+    )
+
+    reply_to = db.Column(
+        db.Integer,
+        db.ForeignKey('chat.id'),
+        nullable=True
+    )
+
+
+def init_db():
+    with app.app_context():
+        db.create_all()
+        inspector = inspect(db.engine)
+        if inspector.has_table('chat'):
+            result = db.session.execute(text("PRAGMA table_info(chat)"))
+            columns = [row[1] for row in result]
+            if 'user_id' not in columns:
+                db.session.execute(text('ALTER TABLE chat ADD COLUMN user_id INTEGER'))
+            if 'recipient' not in columns:
+                db.session.execute(text("ALTER TABLE chat ADD COLUMN recipient VARCHAR(100) NOT NULL DEFAULT 'Admin'"))
+            if 'reply_to' not in columns:
+                db.session.execute(text('ALTER TABLE chat ADD COLUMN reply_to INTEGER'))
+            db.session.commit()
+
+init_db()
+
 # ==========================================
 # USER LOADER
 # ==========================================
@@ -168,9 +208,19 @@ def register():
             email=email
         ).first()
 
+        existing_username = User.query.filter_by(
+            username=username
+        ).first()
+
         if existing_email:
 
             flash('Email already registered')
+
+            return redirect(url_for('register'))
+
+        if existing_username:
+
+            flash('Username already taken')
 
             return redirect(url_for('register'))
 
@@ -253,11 +303,12 @@ def dashboard():
 
         db.session.commit()
 
-    posts = Post.query.all()
+    posts = Post.query.order_by(Post.id.desc()).all()
 
     return render_template(
         'dashboard.html',
-        posts=posts
+        posts=posts,
+        user=current_user.username
     )
 
 # ==========================================
@@ -283,11 +334,12 @@ def diary():
 
     entries = Diary.query.filter_by(
         user_id=current_user.id
-    ).all()
+    ).order_by(Diary.date.desc()).all()
 
     return render_template(
         'diary.html',
-        entries=entries
+        entries=entries,
+        user=current_user.username
     )
 
 # ==========================================
@@ -300,22 +352,71 @@ def chat():
 
     if request.method == 'POST':
 
-        message = request.form['message']
+        if 'reply_to' in request.form and request.form.get('reply_message'):
+            reply_to = request.form['reply_to']
+            reply_text = request.form['reply_message']
+            original = Chat.query.get(int(reply_to))
 
-        new_message = Chat(
-            message=message,
-            sender=current_user.username
-        )
+            if original:
+                reply_sender = 'Admin' if current_user.username.lower() == 'admin' else current_user.username
+                new_message = Chat(
+                    message=f"Reply to {original.sender}: {reply_text}",
+                    sender=reply_sender,
+                    user_id=original.user_id,
+                    recipient=original.sender,
+                    reply_to=original.id
+                )
+            else:
+                flash('Original message not found.')
+                return redirect(url_for('chat'))
+        else:
+            message = request.form['message']
+            new_message = Chat(
+                message=message,
+                sender=current_user.username,
+                user_id=current_user.id,
+                recipient='Admin'
+            )
 
         db.session.add(new_message)
 
         db.session.commit()
 
-    messages = Chat.query.all()
+    if current_user.username.lower() == 'admin':
+        messages = Chat.query.order_by(Chat.id.asc()).all()
+    else:
+        messages = Chat.query.filter_by(
+            user_id=current_user.id
+        ).order_by(Chat.id.asc()).all()
 
     return render_template(
         'chat.html',
-        messages=messages
+        messages=messages,
+        user=current_user.username
+    )
+
+# ==========================================
+# DATABASE VIEW
+
+@app.route('/database')
+@login_required
+def database_view():
+    if current_user.username.lower() != 'admin':
+        flash('Database view is admin only.')
+        return redirect(url_for('dashboard'))
+
+    users = User.query.all()
+    posts = Post.query.order_by(Post.id.desc()).all()
+    diary_entries = Diary.query.order_by(Diary.date.desc()).all()
+    chats = Chat.query.order_by(Chat.id.desc()).all()
+
+    return render_template(
+        'database.html',
+        users=users,
+        posts=posts,
+        diary_entries=diary_entries,
+        chats=chats,
+        user=current_user.username
     )
 
 # ==========================================
@@ -329,3 +430,4 @@ if __name__ == '__main__':
         db.create_all()
 
     app.run(debug=True)
+    
