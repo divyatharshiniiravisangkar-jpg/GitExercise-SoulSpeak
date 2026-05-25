@@ -93,6 +93,46 @@ class Post(db.Model):
         db.ForeignKey('user.id')
     )
 
+    user = db.relationship(
+        'User',
+        backref='posts'
+    )
+
+    votes = db.relationship(
+        'PostVote',
+        backref='post',
+        cascade='all, delete-orphan'
+    )
+
+
+class PostVote(db.Model):
+
+    id = db.Column(
+        db.Integer,
+        primary_key=True
+    )
+
+    value = db.Column(
+        db.Integer,
+        nullable=False
+    )
+
+    post_id = db.Column(
+        db.Integer,
+        db.ForeignKey('post.id'),
+        nullable=False
+    )
+
+    user_id = db.Column(
+        db.Integer,
+        db.ForeignKey('user.id'),
+        nullable=False
+    )
+
+    __table_args__ = (
+        db.UniqueConstraint('post_id', 'user_id', name='uq_post_vote_post_user'),
+    )
+
 
 class Diary(db.Model):
 
@@ -283,6 +323,80 @@ def logout():
     return redirect(url_for('home'))
 
 # ==========================================
+# CREATE POST
+# ==========================================
+
+@app.route('/post', methods=['GET', 'POST'])
+@login_required
+def post():
+
+    if request.method == 'POST':
+
+        content = request.form['content']
+
+        new_post = Post(
+            content=content,
+            user_id=current_user.id
+        )
+
+        db.session.add(new_post)
+
+        db.session.commit()
+
+        flash('Post created')
+
+        return redirect(url_for('dashboard'))
+
+    return render_template(
+        'post.html',
+        user=current_user.username
+    )
+
+
+@app.route('/post/<int:post_id>/react', methods=['POST'])
+@login_required
+def react_to_post(post_id):
+
+    action = request.form.get('action')
+
+    if action not in ('like', 'dislike'):
+
+        flash('Invalid reaction')
+
+        return redirect(url_for('dashboard'))
+
+    post = Post.query.get_or_404(post_id)
+
+    existing_vote = PostVote.query.filter_by(
+        post_id=post.id,
+        user_id=current_user.id
+    ).first()
+
+    vote_value = 1 if action == 'like' else -1
+
+    if existing_vote and existing_vote.value == vote_value:
+
+        db.session.delete(existing_vote)
+
+    elif existing_vote:
+
+        existing_vote.value = vote_value
+
+    else:
+
+        db.session.add(
+            PostVote(
+                post_id=post.id,
+                user_id=current_user.id,
+                value=vote_value
+            )
+        )
+
+    db.session.commit()
+
+    return redirect(url_for('dashboard'))
+
+# ==========================================
 # DASHBOARD
 # ==========================================
 
@@ -305,9 +419,33 @@ def dashboard():
 
     posts = Post.query.order_by(Post.id.desc()).all()
 
+    user_votes = {
+        vote.post_id: vote.value
+        for vote in PostVote.query.filter_by(
+            user_id=current_user.id
+        ).all()
+    }
+
+    post_data = []
+
+    for post in posts:
+
+        likes = sum(1 for vote in post.votes if vote.value == 1)
+
+        dislikes = sum(1 for vote in post.votes if vote.value == -1)
+
+        post_data.append(
+            {
+                'post': post,
+                'likes': likes,
+                'dislikes': dislikes,
+                'user_vote': user_votes.get(post.id)
+            }
+        )
+
     return render_template(
         'dashboard.html',
-        posts=posts,
+        posts=post_data,
         user=current_user.username
     )
 
@@ -431,3 +569,4 @@ if __name__ == '__main__':
 
     app.run(debug=True)
     
+
