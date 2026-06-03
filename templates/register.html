@@ -5,10 +5,21 @@
 {% block content %}
 <h2>Register</h2>
 
-<form method="POST" action="{{ url_for('register') }}">
+<form method="POST" action="{{ url_for('register_with_security') }}">
     <input type="text" name="username" placeholder="Username" required><br><br>
     <input type="email" name="email" placeholder="Email" required><br><br>
     <input type="password" name="password" placeholder="Password" required><br><br>
+
+    <label for="security_question">Security question</label><br>
+    <select name="security_question" id="security_question" required>
+        <option value="What was your first pet's name?">What was your first pet's name?</option>
+        <option value="What is your mother's maiden name?">What is your mother's maiden name?</option>
+        <option value="What is the name of your elementary school?">What is the name of your elementary school?</option>
+        <option value="What is your favorite book?">What is your favorite book?</option>
+    </select><br><br>
+
+    <input type="text" name="security_answer" placeholder="Answer to security question" required><br><br>
+
     <button type="submit">Register</button>
 </form>
 
