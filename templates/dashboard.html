@@ -6,24 +6,61 @@
     <h2>Welcome, {{ user }}</h2>
 
     <nav>
+        <a href="{{ url_for('menu') }}">Menu</a> |
         <a href="{{ url_for('dashboard') }}">Dashboard</a> |
+        <a href="{{ url_for('post') }}">Create Post</a> |
         <a href="{{ url_for('chat') }}">Chat</a> |
         <a href="{{ url_for('diary') }}">Diary</a> |
-        {% if user.lower() == 'admin' %}
-            <a href="{{ url_for('database_view') }}">Database</a> |
+        {% if user.lower() != 'guest' %}
+            {% if user.lower() == 'admin' %}
+                <a href="{{ url_for('database_view') }}">Database</a> |
+            {% endif %}
+            <a href="{{ url_for('logout') }}">Logout</a>
+        {% else %}
+            <a href="{{ url_for('login') }}">Login</a> |
+            <a href="{{ url_for('register') }}">Register</a>
         {% endif %}
-        <a href="{{ url_for('logout') }}">Logout</a>
     </nav>
 
     <hr>
 
     {% if posts %}
         <h3>Recent Posts</h3>
-        <ul>
-            {% for post in posts %}
-                <li>{{ post.content }}</li>
-            {% endfor %}
-        </ul>
+        {% for item in posts %}
+            <div class="post-card">
+                <p><strong>{% if item.post.user %}{{ item.post.user.username }}{% else %}Anonymous{% endif %}</strong> wrote:</p>
+                <p>{{ item.post.content }}</p>
+
+                {% if item.post.image_path %}
+                    <img src="{{ url_for('static', filename=item.post.image_path) }}" alt="Post image" class="post-image">
+                {% endif %}
+
+                <form method="POST" action="{{ url_for('react_to_post', post_id=item.post.id) }}" class="reaction-form">
+                    <button type="submit" name="action" value="like"{% if item.user_vote == 1 %} class="active"{% endif %}>Like</button>
+                    <button type="submit" name="action" value="dislike"{% if item.user_vote == -1 %} class="active"{% endif %}>Dislike</button>
+                    <span>{{ item.likes }} Likes · {{ item.dislikes }} Dislikes</span>
+                </form>
+
+                <div class="comments">
+                    {% if item.comments %}
+                        <h4>Comments</h4>
+                        {% for comment in item.comments %}
+                            <div class="comment">
+                                <strong>{{ comment.user.username }}</strong>: {{ comment.content }}
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <p>No comments yet.</p>
+                    {% endif %}
+
+                    <form method="POST" action="{{ url_for('comment', post_id=item.post.id) }}" class="comment-form">
+                        <input type="text" name="comment_content" placeholder="Add a comment" required>
+                        <button type="submit">Comment</button>
+                    </form>
+                </div>
+            </div>
+            <hr>
+        {% endfor %}
     {% else %}
         <p>No posts yet.</p>
     {% endif %}

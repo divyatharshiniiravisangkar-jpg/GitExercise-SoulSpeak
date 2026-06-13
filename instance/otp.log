@@ -1,0 +1,43 @@
+2026-06-13T13:46:53.200757 loga@gmail.com Your registration OTP Your OTP is: 620276
+2026-06-13T13:47:30.905189 tslsuccessglobal029@gmail.com Your registration OTP Your OTP is: 357256
+2026-06-13T13:47:51.335148 tslsuccessglobal029@gmail.com Your registration OTP (resend) Your OTP is: 477257
+2026-06-13T13:58:37.549401 tslsuccessglobal029@gmail.com Your registration OTP Your OTP is: 636769
+2026-06-13T14:02:22.266612 tslsuccessglobal029@gmail.com Your registration OTP Your OTP is: 234771
+2026-06-13T14:02:53.258756 tslsuccessglobal029@gmail.com Your registration OTP (resend) Your OTP is: 351137
+2026-06-13T14:07:37.053631 tslsuccessglobal029@gmail.com Your registration OTP Your OTP is: 616297
+2026-06-13T14:07:40.032670 FAILED tslsuccessglobal029@gmail.com Your registration OTP (535, b'5.7.8 Username and Password not accepted. For more information, go to\n5.7.8  https://support.google.com/mail/?p=BadCredentials d2e1a72fcca58-8434afd17f5sm4637681b3a.39 - gsmtp')
+2026-06-13T14:08:04.360966 tslsuccessglobal029@gmail.com Your registration OTP (resend) Your OTP is: 263747
+2026-06-13T14:08:06.368626 FAILED tslsuccessglobal029@gmail.com Your registration OTP (resend) (535, b'5.7.8 Username and Password not accepted. For more information, go to\n5.7.8  https://support.google.com/mail/?p=BadCredentials d9443c01a7336-2c42f7c6c5dsm50233345ad.21 - gsmtp')
+2026-06-13T14:34:24.521655 tslsuccessglobal029@gmail.com Your registration OTP Your OTP is: 117031
+2026-06-13T14:34:26.435071 FAILED tslsuccessglobal029@gmail.com Your registration OTP (535, b'5.7.8 Username and Password not accepted. For more information, go to\n5.7.8  https://support.google.com/mail/?p=BadCredentials d9443c01a7336-2c432f77479sm51429175ad.63 - gsmtp')
+2026-06-13T15:28:26.201091 tslsuccessglobal029@gmail.com Your registration OTP Your OTP is: 286331
+2026-06-13T15:28:28.134241 FAILED tslsuccessglobal029@gmail.com Your registration OTP (535, b'5.7.8 Username and Password not accepted. For more information, go to\n5.7.8  https://support.google.com/mail/?p=BadCredentials 98e67ed59e1d1-37a25ecd5dcsm5563871a91.9 - gsmtp')
+2026-06-13T15:29:23.450483 tslsuccessglobal029@gmail.com Your registration OTP (resend) Your OTP is: 272379
+2026-06-13T15:29:25.926812 FAILED tslsuccessglobal029@gmail.com Your registration OTP (resend) (535, b'5.7.8 Username and Password not accepted. For more information, go to\n5.7.8  https://support.google.com/mail/?p=BadCredentials 98e67ed59e1d1-37a2179d743sm5381916a91.17 - gsmtp')
+2026-06-13T15:29:48.054201 tslsuccessglobal029@gmail.com Your registration OTP (resend) Your OTP is: 690231
+2026-06-13T15:29:50.685492 FAILED tslsuccessglobal029@gmail.com Your registration OTP (resend) (535, b'5.7.8 Username and Password not accepted. For more information, go to\n5.7.8  https://support.google.com/mail/?p=BadCredentials 98e67ed59e1d1-37a1f363409sm5784234a91.8 - gsmtp')
+2026-06-13T15:45:09.912163 logananthan970@gmail.com SOULSPEAK app mail test This confirms app.py can send email.
+2026-06-13T15:45:13.724814 SENT logananthan970@gmail.com SOULSPEAK app mail test
+2026-06-13T15:45:59.218489 tslsuccessglobal029@gmail.com Your registration OTP Your OTP is: 628094
+2026-06-13T15:47:53.625232 tslsuccessglobal029@gmail.com Your registration OTP (resend) Your OTP is: 604707
+2026-06-13T15:51:32.328786 tslsuccessglobal029@gmail.com Your registration OTP Your OTP is: 460320
+2026-06-13T15:52:39.989930 tslsuccessglobal029@gmail.com Your registration OTP (resend) Your OTP is: 319796
+2026-06-13T15:52:41.325661 tslsuccessglobal029@gmail.com Your registration OTP (resend) Your OTP is: 190242
+2026-06-13T15:52:42.481908 tslsuccessglobal029@gmail.com Your registration OTP (resend) Your OTP is: 114501
+2026-06-13T15:57:53.667833 tslsuccessglobal029@gmail.com Your registration OTP (resend) Your OTP is: 399954
+2026-06-13T15:57:57.077149 tslsuccessglobal029@gmail.com Your registration OTP (resend) Your OTP is: 938910
+2026-06-13T16:00:44.483019 tslsuccessglobal029@gmail.com SOULSPEAK OTP mail test This is a test from the current app.py SMTP settings.
+2026-06-13T16:00:49.302821 SENT tslsuccessglobal029@gmail.com SOULSPEAK OTP mail test
+2026-06-13T16:01:47.602862 tslsuccessglobal029@gmail.com Your registration OTP Your OTP is: 689812
+2026-06-13T16:02:11.525119 tslsuccessglobal029@gmail.com Your registration OTP (resend) Your OTP is: 856912
+2026-06-13T16:02:55.161702 tslsuccessglobal029@gmail.com Your registration OTP Your OTP is: 800911
+2026-06-13T16:06:25.439615 tslsucccessglobal029@gmail.com Your registration OTP Your OTP is: 445058
+2026-06-13T16:06:28.669744 SENT tslsucccessglobal029@gmail.com Your registration OTP
+2026-06-13T16:07:05.815114 tslsucccessglobal029@gmail.com Your registration OTP (resend) Your OTP is: 219210
+2026-06-13T16:07:10.475009 SENT tslsucccessglobal029@gmail.com Your registration OTP (resend)
+2026-06-13T16:08:37.195979 tslsucccessglobal029@gmail.com Your registration OTP (resend) Your OTP is: 780510
+2026-06-13T16:08:40.991331 SENT tslsucccessglobal029@gmail.com Your registration OTP (resend)
+2026-06-13T16:12:43.837504 tslsucccessglobal029@gmail.com Your registration OTP (resend) Your OTP is: 191263
+2026-06-13T16:12:47.602521 SENT tslsucccessglobal029@gmail.com Your registration OTP (resend)
+2026-06-13T16:31:51.118331 tslsucccessglobal029@gmail.com Your registration OTP (resend) Your OTP is: 889935
+2026-06-13T16:31:55.248485 SENT tslsucccessglobal029@gmail.com Your registration OTP (resend)

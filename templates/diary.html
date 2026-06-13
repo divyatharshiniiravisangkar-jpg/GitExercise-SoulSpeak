@@ -6,12 +6,20 @@
     <h1>Personal Diary</h1>
 
     <nav>
+        <a href="{{ url_for('menu') }}">Menu</a> |
         <a href="{{ url_for('dashboard') }}">Dashboard</a> |
+        <a href="{{ url_for('post') }}">Create Post</a> |
         <a href="{{ url_for('chat') }}">Chat</a> |
-        {% if user.lower() == 'admin' %}
-            <a href="{{ url_for('database_view') }}">Database</a> |
+        <a href="{{ url_for('diary') }}">Diary</a> |
+        {% if user.lower() != 'guest' %}
+            {% if user.lower() == 'admin' %}
+                <a href="{{ url_for('database_view') }}">Database</a> |
+            {% endif %}
+            <a href="{{ url_for('logout') }}">Logout</a>
+        {% else %}
+            <a href="{{ url_for('login') }}">Login</a> |
+            <a href="{{ url_for('register') }}">Register</a>
         {% endif %}
-        <a href="{{ url_for('logout') }}">Logout</a>
     </nav>
 
     <form method="POST" class="diary-form">

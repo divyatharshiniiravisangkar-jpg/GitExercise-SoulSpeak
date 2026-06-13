@@ -68,8 +68,11 @@ def forgot():
     return render_template('forgot_question.html', email=email, question=question)
 
 
-@app.route('/reset_password', methods=['POST'])
+@app.route('/reset_password', methods=['GET', 'POST'])
 def reset_password():
+    if request.method == 'GET':
+        flash('Please use the Forgot Password form to reset your password')
+        return redirect(url_for('forgot'))
     email = request.form.get('email')
     answer = request.form.get('security_answer')
     new_password = request.form.get('new_password')
