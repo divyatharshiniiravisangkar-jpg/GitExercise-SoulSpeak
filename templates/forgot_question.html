@@ -3,16 +3,24 @@
 {% block title %}Answer Security Question{% endblock %}
 
 {% block content %}
-<h2>Answer Security Question</h2>
+<main class="app-page auth-page">
+    <section class="auth-shell single-auth">
+        <div class="form-container auth-card">
+            <p class="eyebrow">Verify identity</p>
+            <h2>Security Question</h2>
+            <p class="form-note">For <strong>{{ email }}</strong></p>
+            <p class="security-question">{{ question }}</p>
 
-<p>For: <strong>{{ email }}</strong></p>
-<p><strong>{{ question }}</strong></p>
+            <form method="POST" action="{{ url_for('reset_password') }}">
+                <input type="hidden" name="email" value="{{ email }}">
+                <input type="text" name="security_answer" placeholder="Your answer" required>
+                <button class="btn" type="submit">Verify Answer</button>
+            </form>
 
-<form method="POST" action="{{ url_for('reset_password') }}">
-    <input type="hidden" name="email" value="{{ email }}">
-    <input type="text" name="security_answer" placeholder="Your answer" required><br><br>
-    <button type="submit">Verify Answer</button>
-</form>
-
-<p><a href="{{ url_for('login') }}">Back to Login</a></p>
+            <div class="form-links">
+                <a href="{{ url_for('login') }}">Back to Login</a>
+            </div>
+        </div>
+    </section>
+</main>
 {% endblock %}

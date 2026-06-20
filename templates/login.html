@@ -3,14 +3,27 @@
 {% block title %}Login{% endblock %}
 
 {% block content %}
-<h2>Login</h2>
+<main class="app-page auth-page">
+    <section class="auth-shell">
+        <div class="auth-copy">
+            <p class="eyebrow">Welcome back</p>
+            <h1>Step into your quiet space.</h1>
+            <p>Sign in to write, reflect, react, and stay connected with the SoulSpeak community.</p>
+        </div>
 
-<form method="POST" action="{{ url_for('login') }}">
-    <input type="email" name="email" placeholder="Email" required><br><br>
-    <input type="password" name="password" placeholder="Password" required><br><br>
-    <button type="submit">Login</button>
-</form>
+        <div class="form-container auth-card">
+            <h2>Login</h2>
+            <form method="POST" action="{{ url_for('login') }}">
+                <input type="email" name="email" placeholder="Email" required>
+                <input type="password" name="password" placeholder="Password" required>
+                <button class="btn" type="submit">Login</button>
+            </form>
 
-<p><a href="{{ url_for('register') }}">Go to Register</a></p>
-<p><a href="{{ url_for('forgot') }}">Forgot password?</a></p>
+            <div class="form-links">
+                <a href="{{ url_for('register') }}">Create account</a>
+                <a href="{{ url_for('forgot') }}">Forgot password?</a>
+            </div>
+        </div>
+    </section>
+</main>
 {% endblock %}

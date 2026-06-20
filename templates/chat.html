@@ -3,53 +3,76 @@
 {% block title %}Chat Room{% endblock %}
 
 {% block content %}
-<h1>Community Chat Room</h1>
+<main class="app-page">
+    <section class="page-heading chat-heading">
+        <p class="eyebrow">Community</p>
+        <h1>Chat Room</h1>
+        <p>Leave a message, read replies, and keep the conversation gentle.</p>
+    </section>
 
-<nav>
-  <a href="{{ url_for('menu') }}">Menu</a> |
-  <a href="{{ url_for('dashboard') }}">Dashboard</a> |
-  <a href="{{ url_for('post') }}">Create Post</a> |
-  <a href="{{ url_for('chat') }}">Chat</a> |
-  <a href="{{ url_for('diary') }}">Diary</a> |
-  <a href="{{ url_for('database_view') }}">Database</a> |
-  <a href="{{ url_for('logout') }}">Logout</a>
-</nav>
+    <section class="chat-layout">
+        <div class="chat-box">
+            {% if originals %}
+                <div class="chat-timeline" aria-hidden="true"></div>
+                {% for msg in originals %}
+                    {% set msg_is_admin = msg.sender and msg.sender.lower() == 'admin' %}
+                    <div class="chat-row {% if msg_is_admin %}sent-row{% else %}received-row{% endif %}">
+                    <article class="message {% if msg_is_admin %}sent{% else %}received{% endif %}">
+                        {% if not msg_is_admin %}
+                            <div class="chat-avatar">{{ (msg.sender or 'U')[:1]|upper }}</div>
+                        {% endif %}
+                        <div class="message-body">
+                            <div class="message-meta">
+                                <strong>{{ msg.sender or 'User' }}</strong>
+                                <span>{{ msg.created_at.strftime('%I:%M %p') if msg.created_at is defined and msg.created_at else '' }}</span>
+                            </div>
+                            <div class="message-text">{{ msg.message }}</div>
+                        </div>
+                        {% if msg_is_admin %}
+                            <div class="chat-avatar admin-avatar">A</div>
+                        {% endif %}
+                    </article>
 
+                    {% if replies_map.get(msg.id) %}
+                        {% for reply in replies_map.get(msg.id) %}
+                            {% set reply_is_admin = reply.sender and reply.sender.lower() == 'admin' %}
+                            <article class="message reply {% if reply_is_admin %}sent{% else %}received{% endif %}">
+                                {% if not reply_is_admin %}
+                                    <div class="chat-avatar">{{ (reply.sender or 'U')[:1]|upper }}</div>
+                                {% endif %}
+                                <div class="message-body">
+                                    <div class="message-meta">
+                                        <strong>{{ reply.sender or 'User' }}{% if reply_is_admin %}<span class="verified-dot">✓</span>{% endif %}</strong>
+                                        <span>{{ reply.created_at.strftime('%I:%M %p') if reply.created_at is defined and reply.created_at else '' }}</span>
+                                    </div>
+                                    <div class="message-text">{{ reply.message }}</div>
+                                </div>
+                                {% if reply_is_admin %}
+                                    <div class="chat-avatar admin-avatar">A</div>
+                                {% endif %}
+                            </article>
+                        {% endfor %}
+                    {% endif %}
 
-<div class="chat-box">
-  {% if originals %}
-    {% for msg in originals %}
-      <div class="message {% if msg.sender and msg.sender.lower() == 'admin' %}admin{% endif %}">
-        <strong>{{ msg.sender or 'User' }}</strong>
-        <div>{{ msg.message }}</div>
-      </div>
+                    {% if is_admin %}
+                        <form class="reply-form" method="POST" action="{{ url_for('chat') }}">
+                            <input type="hidden" name="reply_to" value="{{ msg.id }}">
+                            <input type="text" name="reply_message" placeholder="Reply to this message..." required>
+                            <button type="submit">Reply</button>
+                        </form>
+                    {% endif %}
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p class="empty-state">No messages yet.</p>
+            {% endif %}
+        </div>
 
-      {% if replies_map.get(msg.id) %}
-        {% for reply in replies_map.get(msg.id) %}
-          <div class="message reply {% if reply.sender and reply.sender.lower() == 'admin' %}admin{% endif %}">
-            <strong>{{ reply.sender or 'User' }}</strong>
-            <div>{{ reply.message }}</div>
-          </div>
-        {% endfor %}
-      {% endif %}
-
-      {% if user and user.lower() == 'admin' %}
-        <form class="reply-form" method="POST" action="{{ url_for('chat') }}">
-          <input type="hidden" name="reply_to" value="{{ msg.id }}">
-          <input type="text" name="reply_message" placeholder="Reply to this message..." required>
-          <button type="submit">Reply</button>
+        <form class="send-form chat-compose" method="POST" action="{{ url_for('chat') }}">
+            <span class="compose-icon" aria-hidden="true">↗</span>
+            <input type="text" name="message" placeholder="Write a message..." required>
+            <button type="submit">Send</button>
         </form>
-      {% endif %}
-
-    {% endfor %}
-  {% else %}
-    <p>No messages yet.</p>
-  {% endif %}
-</div>
-
-<form class="send-form" method="POST" action="{{ url_for('chat') }}">
-  <input type="text" name="message" placeholder="Write a message..." required>
-  <button type="submit">Send</button>
-</form>
-
+    </section>
+</main>
 {% endblock %}

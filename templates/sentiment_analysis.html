@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block title %}Sentiment Analysis{% endblock %}
+
+{% block content %}
+<main class="app-page">
+<div class="dashboard admin-dashboard">
+    <section class="widget sentiment-panel">
+        <div class="sentiment-header">
+            <div>
+                <p class="eyebrow">Admin Insight</p>
+                <h3>Community Sentiment</h3>
+            </div>
+            <a href="{{ url_for('database_view') }}" class="nav-btn nav-btn-dashboard">Back to Database</a>
+        </div>
+
+        <div class="sentiment-summary">
+            <div class="sentiment-card happy-card">
+                <span>Happy Posts</span>
+                <strong>{{ happy_count }}</strong>
+                <small>{{ happy_percent }}% of posts</small>
+            </div>
+            <div class="sentiment-card sad-card">
+                <span>Sad Posts</span>
+                <strong>{{ sad_count }}</strong>
+                <small>{{ sad_percent }}% of posts</small>
+            </div>
+            <div class="sentiment-card overall-card">
+                <span>Overall Mood</span>
+                <strong>
+                    {% if happy_count > sad_count %}
+                        Positive
+                    {% elif sad_count > happy_count %}
+                        Negative
+                    {% else %}
+                        Balanced
+                    {% endif %}
+                </strong>
+                <small>
+                    {% if happy_count > sad_count %}
+                        More posts are leaning happy
+                    {% elif sad_count > happy_count %}
+                        More posts are leaning sad
+                    {% else %}
+                        Posts are evenly balanced
+                    {% endif %}
+                </small>
+            </div>
+        </div>
+
+        <div class="sentiment-chart-panel">
+            <div class="sentiment-chart-head">
+                <span>Sentiment Split</span>
+                <strong>{{ happy_percent }}% Happy / {{ sad_percent }}% Sad</strong>
+            </div>
+            <div class="sentiment-chart">
+                <div class="sentiment-chart-fill happy-fill" style="width: {{ happy_percent }}%"></div>
+                <div class="sentiment-chart-fill sad-fill" style="width: {{ sad_percent }}%"></div>
+            </div>
+            <div class="sentiment-chart-legend">
+                <span>Happy ({{ happy_count }})</span>
+                <span>Sad ({{ sad_count }})</span>
+            </div>
+        </div>
+
+        {% if posts %}
+            <div class="sentiment-list">
+                {% for item in posts %}
+                    <article class="sentiment-item">
+                        <div class="sentiment-item-top">
+                            <div>
+                                <h4>{{ item.post.user.username if item.post.user else 'Unknown User' }}</h4>
+                                <p>{{ item.post.created_at.strftime('%b %d, %Y') if item.post.created_at else 'Just now' }}</p>
+                            </div>
+                            <span class="sentiment-tag {{ item.sentiment|lower }}">{{ item.sentiment }}</span>
+                        </div>
+
+                        {% if item.post.content %}
+                            <p class="sentiment-caption">{{ item.post.content }}</p>
+                        {% endif %}
+
+                        {% if item.post.image_path %}
+                            <div class="sentiment-image-wrap">
+                                <img src="{{ url_for('static', filename=item.post.image_path) }}" alt="Post image">
+                            </div>
+                        {% endif %}
+
+                        <div class="sentiment-bars">
+                            <div class="sentiment-bar-group">
+                                <span>Happy</span>
+                                <div class="bar-track">
+                                    <div class="bar-fill happy-fill" style="width: {{ (item.happy_total / item.total_votes * 100) if item.total_votes else 0 }}%"></div>
+                                </div>
+                                <strong>{{ item.happy_total }}</strong>
+                            </div>
+                            <div class="sentiment-bar-group">
+                                <span>Sad</span>
+                                <div class="bar-track">
+                                    <div class="bar-fill sad-fill" style="width: {{ (item.sad_total / item.total_votes * 100) if item.total_votes else 0 }}%"></div>
+                                </div>
+                                <strong>{{ item.sad_total }}</strong>
+                            </div>
+                        </div>
+                    </article>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="empty-state">No posts available for sentiment analysis.</p>
+        {% endif %}
+    </section>
+</div>
+</main>
+{% endblock %}
