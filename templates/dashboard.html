@@ -80,6 +80,12 @@
                                         <span>👎</span> Dislike ({{ item.reaction_counts.get('dislike', 0) }})
                                     </button>
                                 </form>
+                                <div class="reaction-sentiment">
+                                    <span class="sentiment-chip {{ item.sentiment_label|lower }}">
+                                        {{ item.sentiment_label }} sentiment
+                                        <strong>{{ "%+.2f"|format(item.sentiment_score) }}</strong>
+                                    </span>
+                                </div>
                             </div>
 
                             <div class="comment-section">

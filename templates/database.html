@@ -77,7 +77,13 @@
         </div>
         <table>
             <thead>
-                <tr><th>ID</th><th>Username</th><th>Content</th></tr>
+                <tr>
+                    <th>ID</th>
+                    <th>Username</th>
+                    <th>Content</th>
+                    <th>Sentiment</th>
+                    <th>Score</th>
+                </tr>
             </thead>
             <tbody>
                 {% for post in posts %}
@@ -85,6 +91,8 @@
                         <td>{{ post.id }}</td>
                         <td>{{ post.user.username if post.user else 'Unknown' }}</td>
                         <td>{{ post.content }}</td>
+                        <td>{{ post.sentiment_label }}</td>
+                        <td>{{ "%+.2f"|format(post.sentiment_score or 0) }}</td>
                     </tr>
                 {% endfor %}
             </tbody>

@@ -9,59 +9,91 @@
         <div class="sentiment-header">
             <div>
                 <p class="eyebrow">Admin Insight</p>
-                <h3>Community Sentiment</h3>
+                <h3>Reaction Sentiment Analysis</h3>
             </div>
             <a href="{{ url_for('database_view') }}" class="nav-btn nav-btn-dashboard">Back to Database</a>
         </div>
 
         <div class="sentiment-summary">
-            <div class="sentiment-card happy-card">
-                <span>Happy Posts</span>
-                <strong>{{ happy_count }}</strong>
-                <small>{{ happy_percent }}% of posts</small>
+            <div class="sentiment-card positive-card">
+                <span>Positive Posts</span>
+                <strong>{{ positive_count }}</strong>
+                <small>{{ positive_percent }}% of posts</small>
             </div>
-            <div class="sentiment-card sad-card">
-                <span>Sad Posts</span>
-                <strong>{{ sad_count }}</strong>
-                <small>{{ sad_percent }}% of posts</small>
+            <div class="sentiment-card neutral-card">
+                <span>Neutral Posts</span>
+                <strong>{{ neutral_count }}</strong>
+                <small>{{ neutral_percent }}% of posts</small>
             </div>
-            <div class="sentiment-card overall-card">
-                <span>Overall Mood</span>
-                <strong>
-                    {% if happy_count > sad_count %}
-                        Positive
-                    {% elif sad_count > happy_count %}
-                        Negative
-                    {% else %}
-                        Balanced
-                    {% endif %}
-                </strong>
-                <small>
-                    {% if happy_count > sad_count %}
-                        More posts are leaning happy
-                    {% elif sad_count > happy_count %}
-                        More posts are leaning sad
-                    {% else %}
-                        Posts are evenly balanced
-                    {% endif %}
-                </small>
+            <div class="sentiment-card negative-card">
+                <span>Negative Posts</span>
+                <strong>{{ negative_count }}</strong>
+                <small>{{ negative_percent }}% of posts</small>
             </div>
         </div>
 
         <div class="sentiment-chart-panel">
             <div class="sentiment-chart-head">
-                <span>Sentiment Split</span>
-                <strong>{{ happy_percent }}% Happy / {{ sad_percent }}% Sad</strong>
+                <span>Overall Mood</span>
+                <strong>{{ overall_label }} / {{ "%+.2f"|format(average_score) }}</strong>
             </div>
-            <div class="sentiment-chart">
-                <div class="sentiment-chart-fill happy-fill" style="width: {{ happy_percent }}%"></div>
-                <div class="sentiment-chart-fill sad-fill" style="width: {{ sad_percent }}%"></div>
+            <div class="sentiment-chart three-way-chart">
+                <div class="sentiment-chart-fill positive-fill" style="width: {{ positive_percent }}%"></div>
+                <div class="sentiment-chart-fill neutral-fill" style="width: {{ neutral_percent }}%"></div>
+                <div class="sentiment-chart-fill negative-fill" style="width: {{ negative_percent }}%"></div>
             </div>
             <div class="sentiment-chart-legend">
-                <span>Happy ({{ happy_count }})</span>
-                <span>Sad ({{ sad_count }})</span>
+                <span>Positive ({{ positive_count }})</span>
+                <span>Neutral ({{ neutral_count }})</span>
+                <span>Negative ({{ negative_count }})</span>
             </div>
         </div>
+
+        <div class="sentiment-lookup-grid">
+            <section class="sentiment-lookup-card">
+                <h4>Emoji Sentiment Score Lookup</h4>
+                <table class="sentiment-score-table">
+                    <thead>
+                        <tr>
+                            <th>Emoji</th>
+                            <th>Emotion</th>
+                            <th>Sentiment Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for action, item in reaction_score_lookup.items() %}
+                            <tr>
+                                <td class="emoji-cell emoji-{{ action }}"></td>
+                                <td>{{ item.emotion }}</td>
+                                <td>{{ "%+.2f"|format(item.score) }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </section>
+
+            <section class="sentiment-lookup-card">
+                <h4>The Sentiment Score Lookup V(e)</h4>
+                <p class="formula-copy">The valence score is based on the positive, neutral, and negative context of reactions.</p>
+                <div class="formula-box">
+                    V(e) = (p - n) / (p + neu + n)
+                </div>
+                <ul class="formula-list">
+                    <li><strong>p:</strong> positive reaction count</li>
+                    <li><strong>n:</strong> negative reaction count</li>
+                    <li><strong>neu:</strong> neutral reaction count</li>
+                </ul>
+            </section>
+        </div>
+
+        <section class="sentiment-scale-card">
+            <h4>Sentiment Scale</h4>
+            <ul>
+                {% for item in sentiment_scale %}
+                    <li><strong>{{ item.label }}</strong> = {{ item.meaning }}</li>
+                {% endfor %}
+            </ul>
+        </section>
 
         {% if posts %}
             <div class="sentiment-list">
@@ -70,9 +102,11 @@
                         <div class="sentiment-item-top">
                             <div>
                                 <h4>{{ item.post.user.username if item.post.user else 'Unknown User' }}</h4>
-                                <p>{{ item.post.created_at.strftime('%b %d, %Y') if item.post.created_at else 'Just now' }}</p>
+                                <p>{{ item.post.created_at.strftime('%b %d, %Y') if item.post.created_at else 'Date not saved' }}</p>
                             </div>
-                            <span class="sentiment-tag {{ item.sentiment|lower }}">{{ item.sentiment }}</span>
+                            <span class="sentiment-tag {{ item.sentiment|lower }}">
+                                {{ item.sentiment }} {{ "%+.2f"|format(item.sentiment_score) }}
+                            </span>
                         </div>
 
                         {% if item.post.content %}
@@ -85,21 +119,14 @@
                             </div>
                         {% endif %}
 
-                        <div class="sentiment-bars">
-                            <div class="sentiment-bar-group">
-                                <span>Happy</span>
-                                <div class="bar-track">
-                                    <div class="bar-fill happy-fill" style="width: {{ (item.happy_total / item.total_votes * 100) if item.total_votes else 0 }}%"></div>
+                        <div class="reaction-score-grid">
+                            {% for action, lookup in reaction_score_lookup.items() %}
+                                <div class="reaction-score-pill">
+                                    <span class="emoji-cell emoji-{{ action }}"></span>
+                                    <span>{{ lookup.emotion }}</span>
+                                    <strong>{{ item.reaction_counts.get(action, 0) }} x {{ "%+.2f"|format(lookup.score) }}</strong>
                                 </div>
-                                <strong>{{ item.happy_total }}</strong>
-                            </div>
-                            <div class="sentiment-bar-group">
-                                <span>Sad</span>
-                                <div class="bar-track">
-                                    <div class="bar-fill sad-fill" style="width: {{ (item.sad_total / item.total_votes * 100) if item.total_votes else 0 }}%"></div>
-                                </div>
-                                <strong>{{ item.sad_total }}</strong>
-                            </div>
+                            {% endfor %}
                         </div>
                     </article>
                 {% endfor %}

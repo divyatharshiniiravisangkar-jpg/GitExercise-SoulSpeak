@@ -41,6 +41,50 @@ REACTION_MAP = {
     'funny': 4,
 }
 
+REACTION_LABELS = {
+    'love': 'Like / Love',
+    'like': 'Happy',
+    'funny': 'Laugh',
+    'dislike': 'Dislike',
+    'angry': 'Angry',
+    'sad': 'Sad',
+}
+
+REACTION_EMOJIS = {
+    'love': 'heart',
+    'like': 'smile',
+    'funny': 'laugh',
+    'dislike': 'thumbs down',
+    'angry': 'angry',
+    'sad': 'sad',
+}
+
+REACTION_SENTIMENT_SCORES = {
+    'love': 0.74,
+    'like': 0.65,
+    'funny': 0.80,
+    'dislike': -0.60,
+    'angry': -0.85,
+    'sad': -0.65,
+}
+
+SENTIMENT_SCALE = [
+    {'label': '+1.00', 'meaning': 'Extremely Positive'},
+    {'label': '+0.50 to +0.99', 'meaning': 'Positive'},
+    {'label': '0.00', 'meaning': 'Neutral'},
+    {'label': '-0.50 to -0.99', 'meaning': 'Negative'},
+    {'label': '-1.00', 'meaning': 'Extremely Negative'},
+]
+
+REACTION_SCORE_LOOKUP = {
+    action: {
+        'emoji': REACTION_EMOJIS[action],
+        'emotion': REACTION_LABELS[action],
+        'score': REACTION_SENTIMENT_SCORES[action],
+    }
+    for action in ('love', 'like', 'funny', 'dislike', 'angry', 'sad')
+}
+
 
 def load_env_file(path='.env'):
     if not os.path.exists(path):
@@ -222,6 +266,45 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+
+def sentiment_label_for_score(score):
+    if score >= 0.50:
+        return 'Positive'
+    if score <= -0.50:
+        return 'Negative'
+    return 'Neutral'
+
+
+def reaction_counts_for_post(post):
+    votes = PostVote.query.filter_by(post_id=post.id).all() if post.id else post.votes
+    return {
+        action: sum(1 for vote in votes if vote.value == value)
+        for action, value in REACTION_MAP.items()
+    }
+
+
+def calculate_post_sentiment(post):
+    reaction_counts = reaction_counts_for_post(post)
+    total_reactions = sum(reaction_counts.values())
+
+    if total_reactions == 0:
+        return reaction_counts, 0.0, 'Neutral'
+
+    weighted_score = sum(
+        reaction_counts[action] * REACTION_SENTIMENT_SCORES[action]
+        for action in REACTION_MAP
+    )
+    score = round(weighted_score / total_reactions, 2)
+
+    return reaction_counts, score, sentiment_label_for_score(score)
+
+
+def update_post_sentiment(post):
+    reaction_counts, score, label = calculate_post_sentiment(post)
+    post.sentiment_score = score
+    post.sentiment_label = label
+    return reaction_counts, score, label
+
 # ==========================================
 # LOGIN MANAGER
 # ==========================================
@@ -275,6 +358,23 @@ class Post(db.Model):
     image_path = db.Column(
         db.String(255),
         nullable=True
+    )
+
+    sentiment_score = db.Column(
+        db.Float,
+        nullable=False,
+        default=0.0
+    )
+
+    sentiment_label = db.Column(
+        db.String(30),
+        nullable=False,
+        default='Neutral'
+    )
+
+    created_at = db.Column(
+        db.DateTime,
+        default=datetime.utcnow
     )
 
     user_id = db.Column(
@@ -447,6 +547,12 @@ def init_db():
             columns = [row[1] for row in result]
             if 'image_path' not in columns:
                 db.session.execute(text("ALTER TABLE post ADD COLUMN image_path VARCHAR(255)"))
+            if 'sentiment_score' not in columns:
+                db.session.execute(text("ALTER TABLE post ADD COLUMN sentiment_score FLOAT NOT NULL DEFAULT 0.0"))
+            if 'sentiment_label' not in columns:
+                db.session.execute(text("ALTER TABLE post ADD COLUMN sentiment_label VARCHAR(30) NOT NULL DEFAULT 'Neutral'"))
+            if 'created_at' not in columns:
+                db.session.execute(text("ALTER TABLE post ADD COLUMN created_at DATETIME"))
             db.session.commit()
 
 init_db()
@@ -867,12 +973,9 @@ def react_to_post(post_id):
             )
         )
 
+    db.session.flush()
+    reaction_counts, sentiment_score, sentiment = update_post_sentiment(post)
     db.session.commit()
-
-    reaction_counts = {
-        reaction: sum(1 for vote in post.votes if vote.value == value)
-        for reaction, value in REACTION_MAP.items()
-    }
 
     updated_vote = PostVote.query.filter_by(
         post_id=post.id,
@@ -883,22 +986,13 @@ def react_to_post(post_id):
         None
     )
 
-    happy_total = reaction_counts.get('love', 0) + reaction_counts.get('like', 0) + reaction_counts.get('funny', 0)
-    sad_total = reaction_counts.get('dislike', 0) + reaction_counts.get('sad', 0) + reaction_counts.get('angry', 0)
-
-    if happy_total > sad_total:
-        sentiment = 'Happy'
-    elif sad_total > happy_total:
-        sentiment = 'Sad'
-    else:
-        sentiment = 'Balanced'
-
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return jsonify({
             'success': True,
             'reaction_counts': reaction_counts,
             'user_reaction': user_reaction,
-            'sentiment': sentiment
+            'sentiment': sentiment,
+            'sentiment_score': sentiment_score
         })
 
     return redirect(url_for('dashboard'))
@@ -968,10 +1062,7 @@ def dashboard():
     post_data = []
 
     for post in posts:
-        reaction_counts = {
-            action: sum(1 for vote in post.votes if vote.value == value)
-            for action, value in REACTION_MAP.items()
-        }
+        reaction_counts, sentiment_score, sentiment_label = update_post_sentiment(post)
 
         user_vote = user_votes.get(post.id)
         user_reaction = next(
@@ -985,10 +1076,14 @@ def dashboard():
                 'reaction_counts': reaction_counts,
                 'user_vote': user_vote,
                 'user_reaction': user_reaction,
+                'sentiment_score': sentiment_score,
+                'sentiment_label': sentiment_label,
                 'comments': sorted(post.comments, key=lambda c: c.created_at),
                 'can_delete': can_delete_post(post)
             }
         )
+
+    db.session.commit()
 
     user_display = current_user.username if current_user.is_authenticated else 'Guest'
     return render_template(
@@ -1125,6 +1220,10 @@ def database_view():
     diary_entries = Diary.query.order_by(Diary.date.desc()).all()
     chats = Chat.query.order_by(Chat.id.desc()).all()
 
+    for post in posts:
+        update_post_sentiment(post)
+    db.session.commit()
+
     return render_template(
         'database.html',
         users=users,
@@ -1147,68 +1246,55 @@ def sentiment_analysis():
 
     posts = Post.query.order_by(Post.id.desc()).all()
     sentiment_items = []
-    happy_count = 0
-    sad_count = 0
+    positive_count = 0
+    negative_count = 0
+    neutral_count = 0
+    total_score = 0
 
     for post in posts:
-        reaction_counts = {
-            action: sum(1 for vote in post.votes if vote.value == value)
-            for action, value in REACTION_MAP.items()
-        }
+        reaction_counts, sentiment_score, sentiment = update_post_sentiment(post)
+        total_votes = sum(reaction_counts.values())
+        total_score += sentiment_score
 
-        happy_total = (
-            reaction_counts.get('love', 0)
-            + reaction_counts.get('like', 0)
-            + reaction_counts.get('funny', 0)
-        )
-        sad_total = (
-            reaction_counts.get('dislike', 0)
-            + reaction_counts.get('sad', 0)
-            + reaction_counts.get('angry', 0)
-        )
-        total_votes = happy_total + sad_total
-
-        if total_votes == 0:
-            sentiment = 'Neutral'
-            sentiment_score = 0
-        elif happy_total > sad_total:
-            sentiment = 'Happy'
-            sentiment_score = round((happy_total / total_votes) * 100)
-        elif sad_total > happy_total:
-            sentiment = 'Sad'
-            sentiment_score = round((sad_total / total_votes) * 100)
+        if sentiment == 'Positive':
+            positive_count += 1
+        elif sentiment == 'Negative':
+            negative_count += 1
         else:
-            sentiment = 'Neutral'
-            sentiment_score = 50
-
-        if sentiment == 'Happy':
-            happy_count += 1
-        elif sentiment == 'Sad':
-            sad_count += 1
+            neutral_count += 1
 
         sentiment_items.append(
             {
                 'post': post,
                 'reaction_counts': reaction_counts,
-                'happy_total': happy_total,
-                'sad_total': sad_total,
                 'total_votes': total_votes,
                 'sentiment': sentiment,
                 'sentiment_score': sentiment_score,
             }
         )
 
+    db.session.commit()
+
     total_posts = len(sentiment_items)
-    happy_percent = round((happy_count / total_posts) * 100) if total_posts else 0
-    sad_percent = round((sad_count / total_posts) * 100) if total_posts else 0
+    positive_percent = round((positive_count / total_posts) * 100) if total_posts else 0
+    negative_percent = round((negative_count / total_posts) * 100) if total_posts else 0
+    neutral_percent = round((neutral_count / total_posts) * 100) if total_posts else 0
+    average_score = round(total_score / total_posts, 2) if total_posts else 0.0
+    overall_label = sentiment_label_for_score(average_score)
 
     return render_template(
         'sentiment_analysis.html',
         posts=sentiment_items,
-        happy_count=happy_count,
-        sad_count=sad_count,
-        happy_percent=happy_percent,
-        sad_percent=sad_percent,
+        positive_count=positive_count,
+        negative_count=negative_count,
+        neutral_count=neutral_count,
+        positive_percent=positive_percent,
+        negative_percent=negative_percent,
+        neutral_percent=neutral_percent,
+        average_score=average_score,
+        overall_label=overall_label,
+        reaction_score_lookup=REACTION_SCORE_LOOKUP,
+        sentiment_scale=SENTIMENT_SCALE,
         total_posts=total_posts,
         user=current_user.username
     )

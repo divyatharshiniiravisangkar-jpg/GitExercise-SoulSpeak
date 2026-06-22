@@ -881,8 +881,11 @@ th {
     margin: 8px 0;
 }
 
-.happy-card { color: #7ee787; }
-.sad-card { color: #fca5a5; }
+.happy-card,
+.positive-card { color: #7ee787; }
+.neutral-card { color: #cbd5e1; }
+.sad-card,
+.negative-card { color: #fca5a5; }
 .overall-card { color: #93c5fd; }
 
 .sentiment-list {
@@ -928,14 +931,30 @@ th {
     color: #86efac;
 }
 
+.sentiment-tag.positive,
+.sentiment-chip.positive {
+    background: rgba(34, 197, 94, 0.12);
+    color: #86efac;
+    border: 1px solid rgba(134, 239, 172, 0.18);
+}
+
 .sentiment-tag.sad {
     background: rgba(239, 68, 68, 0.12);
     color: #fca5a5;
 }
 
-.sentiment-tag.neutral {
+.sentiment-tag.negative,
+.sentiment-chip.negative {
+    background: rgba(239, 68, 68, 0.12);
+    color: #fca5a5;
+    border: 1px solid rgba(252, 165, 165, 0.18);
+}
+
+.sentiment-tag.neutral,
+.sentiment-chip.neutral {
     background: rgba(148, 163, 184, 0.12);
     color: #cbd5e1;
+    border: 1px solid rgba(203, 213, 225, 0.16);
 }
 
 .sentiment-caption {
@@ -986,8 +1005,121 @@ th {
     border-radius: 999px;
 }
 
-.happy-fill { background: linear-gradient(90deg, #22c55e, #86efac); }
-.sad-fill { background: linear-gradient(90deg, #ef4444, #fca5a5); }
+.happy-fill,
+.positive-fill { background: linear-gradient(90deg, #22c55e, #86efac); }
+.neutral-fill { background: linear-gradient(90deg, #64748b, #cbd5e1); }
+.sad-fill,
+.negative-fill { background: linear-gradient(90deg, #ef4444, #fca5a5); }
+
+.sentiment-chip strong {
+    color: inherit;
+}
+
+.sentiment-lookup-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.85fr);
+    gap: 16px;
+    margin-bottom: 18px;
+}
+
+.sentiment-lookup-card,
+.sentiment-scale-card {
+    padding: 18px;
+    border-radius: 18px;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03));
+    border: 1px solid rgba(188, 207, 255, 0.18);
+}
+
+.sentiment-lookup-card h4,
+.sentiment-scale-card h4 {
+    margin-bottom: 12px;
+    color: var(--text);
+}
+
+.sentiment-score-table th,
+.sentiment-score-table td {
+    padding: 13px 12px;
+}
+
+.emoji-cell {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    font-size: 1.25rem;
+}
+
+.emoji-love::before { content: "\2764\FE0F"; }
+.emoji-like::before { content: "\1F60A"; }
+.emoji-funny::before { content: "\1F604"; }
+.emoji-dislike::before { content: "\1F44E"; }
+.emoji-angry::before { content: "\1F621"; }
+.emoji-sad::before { content: "\1F622"; }
+
+.formula-copy {
+    margin-bottom: 12px;
+    line-height: 1.6;
+}
+
+.formula-box {
+    margin: 14px 0;
+    padding: 16px;
+    text-align: center;
+    color: #ffffff;
+    font-weight: 700;
+    border-radius: 14px;
+    background: rgba(8, 13, 35, 0.62);
+    border: 1px solid rgba(188, 207, 255, 0.18);
+}
+
+.formula-list,
+.sentiment-scale-card ul {
+    display: grid;
+    gap: 10px;
+    padding-left: 18px;
+    color: var(--muted);
+}
+
+.formula-list strong,
+.sentiment-scale-card strong {
+    color: #ffffff;
+}
+
+.sentiment-scale-card {
+    margin-bottom: 18px;
+}
+
+.reaction-score-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 10px;
+}
+
+.reaction-score-pill {
+    display: grid;
+    grid-template-columns: 34px 1fr;
+    gap: 2px 8px;
+    align-items: center;
+    padding: 10px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(188, 207, 255, 0.14);
+}
+
+.reaction-score-pill .emoji-cell {
+    grid-row: span 2;
+}
+
+.reaction-score-pill span:not(.emoji-cell) {
+    color: #ffffff;
+    font-weight: 600;
+}
+
+.reaction-score-pill strong {
+    color: var(--muted);
+    font-size: 0.82rem;
+}
 
 .nav-button-row {
     display: flex;
