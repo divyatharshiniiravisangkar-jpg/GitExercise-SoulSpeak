@@ -3,65 +3,149 @@
 {% block title %}Dashboard{% endblock %}
 
 {% block content %}
-    <h2>Welcome, {{ user }}</h2>
+<main class="feed-scene">
+    <section class="feed-shell" aria-label="Recent posts">
+        <div class="feed-title-row">
+            <h2>Recent Posts</h2>
+            <a class="feed-create-link" href="{{ url_for('post') }}">Create Post</a>
+        </div>
 
-    <nav>
-        <a href="{{ url_for('menu') }}">Menu</a> |
-        <a href="{{ url_for('dashboard') }}">Dashboard</a> |
-        <a href="{{ url_for('post') }}">Create Post</a> |
-        <a href="{{ url_for('chat') }}">Chat</a> |
-        <a href="{{ url_for('diary') }}">Diary</a> |
-        {% if user.lower() != 'guest' %}
-            {% if user.lower() == 'admin' %}
-                <a href="{{ url_for('database_view') }}">Database</a> |
-            {% endif %}
-            <a href="{{ url_for('logout') }}">Logout</a>
-        {% else %}
-            <a href="{{ url_for('login') }}">Login</a> |
-            <a href="{{ url_for('register') }}">Register</a>
-        {% endif %}
-    </nav>
+        <aside class="crystal-panel crystal-panel-left" aria-hidden="true">
+            <span class="vine vine-a"></span>
+            <span class="vine vine-b"></span>
+            <span class="crystal crystal-a"></span>
+            <span class="crystal crystal-b"></span>
+            <span class="crystal crystal-c"></span>
+            <span class="leaf leaf-a"></span>
+            <span class="leaf leaf-b"></span>
+        </aside>
 
-    <hr>
-
-    {% if posts %}
-        <h3>Recent Posts</h3>
-        {% for item in posts %}
-            <div class="post-card">
-                <p><strong>{% if item.post.user %}{{ item.post.user.username }}{% else %}Anonymous{% endif %}</strong> wrote:</p>
-                <p>{{ item.post.content }}</p>
-
-                {% if item.post.image_path %}
-                    <img src="{{ url_for('static', filename=item.post.image_path) }}" alt="Post image" class="post-image">
-                {% endif %}
-
-                <form method="POST" action="{{ url_for('react_to_post', post_id=item.post.id) }}" class="reaction-form">
-                    <button type="submit" name="action" value="like"{% if item.user_vote == 1 %} class="active"{% endif %}>Like</button>
-                    <button type="submit" name="action" value="dislike"{% if item.user_vote == -1 %} class="active"{% endif %}>Dislike</button>
-                    <span>{{ item.likes }} Likes · {{ item.dislikes }} Dislikes</span>
-                </form>
-
-                <div class="comments">
-                    {% if item.comments %}
-                        <h4>Comments</h4>
-                        {% for comment in item.comments %}
-                            <div class="comment">
-                                <strong>{{ comment.user.username }}</strong>: {{ comment.content }}
+        <section class="post-widget">
+            {% if posts %}
+                <div class="post-feed">
+                    {% for item in posts %}
+                        {% set author = item.post.user.username if item.post.user else 'Anonymous' %}
+                        {% set initials = author[:1]|upper %}
+                        {% set comment_count = item.comments|length %}
+                        <article class="post-card">
+                            <div class="post-card-header">
+                                <div class="post-user">
+                                    <div class="avatar">{{ initials }}</div>
+                                    <div class="post-meta">
+                                        <div class="user-row">
+                                            <span class="username">{{ author }}</span>
+                                            <span class="verified" aria-label="Verified">✓</span>
+                                        </div>
+                                        <span class="post-time">shared a reflection</span>
+                                    </div>
+                                </div>
+                                {% if item.can_delete %}
+                                    <div class="post-options">
+                                        <button class="post-menu" type="button" aria-label="Post options">&#8942;</button>
+                                        <div class="post-options-menu">
+                                            <form method="POST" action="{{ url_for('delete_post', post_id=item.post.id) }}">
+                                                <button type="submit" class="post-delete-btn">Delete post</button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                {% endif %}
                             </div>
-                        {% endfor %}
-                    {% else %}
-                        <p>No comments yet.</p>
-                    {% endif %}
 
-                    <form method="POST" action="{{ url_for('comment', post_id=item.post.id) }}" class="comment-form">
-                        <input type="text" name="comment_content" placeholder="Add a comment" required>
-                        <button type="submit">Comment</button>
-                    </form>
+                            <p class="post-caption">{{ item.post.content }}</p>
+
+                            {% if item.post.image_path %}
+                                <div class="post-image-wrap">
+                                    <img src="{{ url_for('static', filename=item.post.image_path) }}" alt="Post image" class="post-image">
+                                </div>
+                            {% endif %}
+
+                            <div class="reaction-summary-panel">
+                                <form method="POST" action="{{ url_for('react_to_post', post_id=item.post.id) }}" class="reaction-summary-box">
+                                    <button type="submit" name="action" value="like" class="reaction-pill like-pill{% if item.user_reaction == 'like' %} active{% endif %}">
+                                        <span>👍</span> Like ({{ item.reaction_counts.get('like', 0) }})
+                                    </button>
+                                    <button type="submit" name="action" value="love" class="reaction-pill love-pill{% if item.user_reaction == 'love' %} active{% endif %}">
+                                        <span>♥</span> Love ({{ item.reaction_counts.get('love', 0) }})
+                                    </button>
+                                    <button type="submit" name="action" value="funny" class="reaction-pill funny-pill{% if item.user_reaction == 'funny' %} active{% endif %}">
+                                        <span>😄</span> Laugh ({{ item.reaction_counts.get('funny', 0) }})
+                                    </button>
+                                    <button type="submit" name="action" value="sad" class="reaction-pill sad-pill{% if item.user_reaction == 'sad' %} active{% endif %}">
+                                        <span>😔</span> Sad ({{ item.reaction_counts.get('sad', 0) }})
+                                    </button>
+                                    <button type="submit" name="action" value="angry" class="reaction-pill angry-pill{% if item.user_reaction == 'angry' %} active{% endif %}">
+                                        <span>😡</span> Angry ({{ item.reaction_counts.get('angry', 0) }})
+                                    </button>
+                                    <button type="submit" name="action" value="dislike" class="reaction-pill dislike-pill{% if item.user_reaction == 'dislike' %} active{% endif %}">
+                                        <span>👎</span> Dislike ({{ item.reaction_counts.get('dislike', 0) }})
+                                    </button>
+                                </form>
+                                <div class="reaction-sentiment">
+                                    <span class="sentiment-chip {{ item.sentiment_label|lower }}">
+                                        {{ item.sentiment_label }} sentiment
+                                        <strong>{{ "%+.2f"|format(item.sentiment_score) }}</strong>
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div class="comment-section">
+                                <div class="comment-top">
+                                    <span>💬 Comments ({{ comment_count }})</span>
+                                </div>
+
+                                <div class="comment-list">
+                                    {% if item.comments %}
+                                        {% for comment in item.comments[:3] %}
+                                            {% set commenter = comment.user.username if comment.user else 'Guest' %}
+                                            <div class="comment-item">
+                                                <div class="comment-user-avatar">{{ commenter[:1]|upper }}</div>
+                                                <div class="comment-text-wrap">
+                                                    <strong>{{ commenter }}</strong>
+                                                    <span>{{ comment.content }}</span>
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                    {% else %}
+                                        <p class="empty-state compact">No comments yet.</p>
+                                    {% endif %}
+                                </div>
+
+                                <form method="POST" action="{{ url_for('comment', post_id=item.post.id) }}" class="comment-form">
+                                    <div class="comment-input-wrap">
+                                        <input type="text" name="comment_content" placeholder="Add a comment..." required>
+                                    </div>
+                                    <button type="submit" aria-label="Send comment">➤</button>
+                                </form>
+                            </div>
+                        </article>
+                    {% endfor %}
                 </div>
-            </div>
-            <hr>
-        {% endfor %}
-    {% else %}
-        <p>No posts yet.</p>
-    {% endif %}
+            {% else %}
+                <article class="post-card empty-feed-card">
+                    <div class="post-card-header">
+                        <div class="post-user">
+                            <div class="avatar">S</div>
+                            <div class="post-meta">
+                                <span class="username">SoulSpeak</span>
+                                <span class="post-time">waiting for the first post</span>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="post-caption">No posts yet. Share the first thought when you are ready.</p>
+                    <a class="feed-create-link large" href="{{ url_for('post') }}">Create Post</a>
+                </article>
+            {% endif %}
+        </section>
+
+        <aside class="crystal-panel crystal-panel-right" aria-hidden="true">
+            <span class="circuit circuit-a"></span>
+            <span class="circuit circuit-b"></span>
+            <span class="circuit circuit-c"></span>
+            <span class="star star-a"></span>
+            <span class="star star-b"></span>
+            <span class="leaf leaf-c"></span>
+            <span class="leaf leaf-d"></span>
+        </aside>
+    </section>
+</main>
 {% endblock %}

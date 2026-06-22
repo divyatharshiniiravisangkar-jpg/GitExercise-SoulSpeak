@@ -3,12 +3,22 @@
 {% block title %}Forgot Password{% endblock %}
 
 {% block content %}
-<h2>Forgot Password</h2>
+<main class="app-page auth-page">
+    <section class="auth-shell single-auth">
+        <div class="form-container auth-card">
+            <p class="eyebrow">Account recovery</p>
+            <h2>Forgot Password</h2>
+            <p class="form-note">Enter your registered email and we will guide you to the next step.</p>
 
-<form method="POST" action="{{ url_for('forgot') }}">
-    <input type="email" name="email" placeholder="Enter your registered email" required><br><br>
-    <button type="submit">Continue</button>
-</form>
+            <form method="POST" action="{{ url_for('forgot') }}">
+                <input type="email" name="email" placeholder="Registered email" required>
+                <button class="btn" type="submit">Continue</button>
+            </form>
 
-<p><a href="{{ url_for('login') }}">Back to Login</a></p>
+            <div class="form-links">
+                <a href="{{ url_for('login') }}">Back to Login</a>
+            </div>
+        </div>
+    </section>
+</main>
 {% endblock %}

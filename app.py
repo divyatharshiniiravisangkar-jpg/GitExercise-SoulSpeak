@@ -10,6 +10,7 @@ from flask import redirect
 from flask import url_for
 from flask import flash
 from flask import session
+from flask import jsonify
 
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import inspect, text
@@ -30,6 +31,59 @@ import random
 import smtplib
 import ssl
 from email.message import EmailMessage
+
+REACTION_MAP = {
+    'love': 6,
+    'like': 1,
+    'dislike': -1,
+    'sad': 2,
+    'angry': 3,
+    'funny': 4,
+}
+
+REACTION_LABELS = {
+    'love': 'Like / Love',
+    'like': 'Happy',
+    'funny': 'Laugh',
+    'dislike': 'Dislike',
+    'angry': 'Angry',
+    'sad': 'Sad',
+}
+
+REACTION_EMOJIS = {
+    'love': 'heart',
+    'like': 'smile',
+    'funny': 'laugh',
+    'dislike': 'thumbs down',
+    'angry': 'angry',
+    'sad': 'sad',
+}
+
+REACTION_SENTIMENT_SCORES = {
+    'love': 0.74,
+    'like': 0.65,
+    'funny': 0.80,
+    'dislike': -0.60,
+    'angry': -0.85,
+    'sad': -0.65,
+}
+
+SENTIMENT_SCALE = [
+    {'label': '+1.00', 'meaning': 'Extremely Positive'},
+    {'label': '+0.50 to +0.99', 'meaning': 'Positive'},
+    {'label': '0.00', 'meaning': 'Neutral'},
+    {'label': '-0.50 to -0.99', 'meaning': 'Negative'},
+    {'label': '-1.00', 'meaning': 'Extremely Negative'},
+]
+
+REACTION_SCORE_LOOKUP = {
+    action: {
+        'emoji': REACTION_EMOJIS[action],
+        'emotion': REACTION_LABELS[action],
+        'score': REACTION_SENTIMENT_SCORES[action],
+    }
+    for action in ('love', 'like', 'funny', 'dislike', 'angry', 'sad')
+}
 
 
 def load_env_file(path='.env'):
@@ -59,13 +113,45 @@ app = Flask(__name__, instance_relative_config=True)
 app.config['SECRET_KEY'] = 'soulspeaksecret'
 
 # Mail settings can be supplied via environment variables for real email delivery
-app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER')
+app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
 app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', 587))
 app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
 app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
+app.config['ADMIN_EMAILS'] = {
+    email.strip().lower()
+    for email in os.environ.get('ADMIN_EMAILS', 'logananthan02@gmail.com').split(',')
+    if email.strip()
+}
 
 # Developer helper: show OTP on the verification page when enabled (for testing only)
 app.config['SHOW_OTP'] = os.environ.get('SHOW_OTP', '0').strip().lower() in ('1', 'true', 'yes')
+
+
+def should_show_otp(email_sent=False):
+    return app.config.get('SHOW_OTP', False)
+
+
+def is_admin_user(user=None):
+    user = user or current_user
+    if not getattr(user, 'is_authenticated', False):
+        return False
+
+    username = (getattr(user, 'username', '') or '').strip().lower()
+    email = (getattr(user, 'email', '') or '').strip().lower()
+    return username == 'admin' or email in app.config.get('ADMIN_EMAILS', set())
+
+
+def can_delete_post(post, user=None):
+    user = user or current_user
+    if not getattr(user, 'is_authenticated', False):
+        return False
+
+    return is_admin_user(user) or post.user_id == user.id
+
+
+@app.context_processor
+def inject_admin_status():
+    return {'is_admin': is_admin_user()}
 
 
 def send_email(to_addr, subject, body):
@@ -91,28 +177,26 @@ def send_email(to_addr, subject, body):
         print('Failed to send email: Gmail App Password must be 16 characters')
         return False
 
-    # Build the email message
     msg = EmailMessage()
-    # Plain text
     msg.set_content(body)
-    # HTML alternative for better inbox rendering
+
     html_body = f"""
-    <html>
-      <body>
-        <h2>SOULSPEAK</h2>
-        <p>{body}</p>
-        <p>If you did not request this, please ignore.</p>
-      </body>
+    <!doctype html>
+    <html lang="en">
+        <body style="margin:0;padding:24px;background:#f6f8fb;font-family:Arial,sans-serif;color:#1f2937;">
+            <div style="max-width:520px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:14px;padding:24px;">
+                <p style="margin:0 0 10px;color:#2563eb;font-size:12px;font-weight:700;letter-spacing:1.6px;">SOULSPEAK</p>
+                <h2 style="margin:0 0 12px;font-size:22px;color:#111827;">Your verification code</h2>
+                <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">Use this code to complete your SoulSpeak registration:</p>
+                <div style="font-size:32px;font-weight:700;letter-spacing:8px;color:#111827;background:#f3f4f6;border-radius:12px;padding:16px;text-align:center;">{body.replace('Your OTP is:', '').strip()}</div>
+                <p style="margin:18px 0 0;font-size:13px;line-height:1.6;color:#6b7280;">This code expires in 15 minutes. If you did not request it, you can ignore this email.</p>
+            </div>
+        </body>
     </html>
     """
     msg.add_alternative(html_body, subtype='html')
-    # Friendly headers
     msg['Subject'] = subject
-    try:
-        display_from = f"SOULSPEAK <{mail_user}>"
-    except Exception:
-        display_from = mail_user
-    msg['From'] = display_from
+    msg['From'] = f"SoulSpeak <{mail_user}>"
     msg['To'] = to_addr
     msg['Reply-To'] = mail_user
     context = ssl.create_default_context()
@@ -152,13 +236,21 @@ def mail_setup_message():
     mail_user = (app.config.get('MAIL_USERNAME') or '').strip()
     mail_pass = (app.config.get('MAIL_PASSWORD') or '').replace(' ', '').strip()
 
-    if not (mail_server and mail_user and mail_pass):
-        return 'OTP email could not be sent. Fill MAIL_SERVER, MAIL_USERNAME, and MAIL_PASSWORD in .env.'
+    missing = []
+    if not mail_server:
+        missing.append('MAIL_SERVER')
+    if not mail_user:
+        missing.append('MAIL_USERNAME')
+    if not mail_pass:
+        missing.append('MAIL_PASSWORD')
+
+    if missing:
+        return 'OTP email could not be sent. Missing in .env: ' + ', '.join(missing) + '.'
 
     if mail_server == 'smtp.gmail.com' and len(mail_pass) != 16:
         return 'OTP email could not be sent. Gmail needs a 16-character App Password, not your normal Gmail password.'
 
-    return 'OTP email could not be sent. Check your MAIL settings or enable SHOW_OTP=1 for local testing.'
+    return 'OTP email could not be sent. Check your MAIL settings in .env.'
 
 os.makedirs(app.instance_path, exist_ok=True)
 app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(app.instance_path, 'database.db')}"
@@ -173,6 +265,45 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def sentiment_label_for_score(score):
+    if score >= 0.50:
+        return 'Positive'
+    if score <= -0.50:
+        return 'Negative'
+    return 'Neutral'
+
+
+def reaction_counts_for_post(post):
+    votes = PostVote.query.filter_by(post_id=post.id).all() if post.id else post.votes
+    return {
+        action: sum(1 for vote in votes if vote.value == value)
+        for action, value in REACTION_MAP.items()
+    }
+
+
+def calculate_post_sentiment(post):
+    reaction_counts = reaction_counts_for_post(post)
+    total_reactions = sum(reaction_counts.values())
+
+    if total_reactions == 0:
+        return reaction_counts, 0.0, 'Neutral'
+
+    weighted_score = sum(
+        reaction_counts[action] * REACTION_SENTIMENT_SCORES[action]
+        for action in REACTION_MAP
+    )
+    score = round(weighted_score / total_reactions, 2)
+
+    return reaction_counts, score, sentiment_label_for_score(score)
+
+
+def update_post_sentiment(post):
+    reaction_counts, score, label = calculate_post_sentiment(post)
+    post.sentiment_score = score
+    post.sentiment_label = label
+    return reaction_counts, score, label
 
 # ==========================================
 # LOGIN MANAGER
@@ -227,6 +358,23 @@ class Post(db.Model):
     image_path = db.Column(
         db.String(255),
         nullable=True
+    )
+
+    sentiment_score = db.Column(
+        db.Float,
+        nullable=False,
+        default=0.0
+    )
+
+    sentiment_label = db.Column(
+        db.String(30),
+        nullable=False,
+        default='Neutral'
+    )
+
+    created_at = db.Column(
+        db.DateTime,
+        default=datetime.utcnow
     )
 
     user_id = db.Column(
@@ -371,6 +519,11 @@ class Chat(db.Model):
         nullable=True
     )
 
+    created_at = db.Column(
+        db.DateTime,
+        default=datetime.utcnow
+    )
+
 
 def init_db():
     with app.app_context():
@@ -385,6 +538,8 @@ def init_db():
                 db.session.execute(text("ALTER TABLE chat ADD COLUMN recipient VARCHAR(100) NOT NULL DEFAULT 'Admin'"))
             if 'reply_to' not in columns:
                 db.session.execute(text('ALTER TABLE chat ADD COLUMN reply_to INTEGER'))
+            if 'created_at' not in columns:
+                db.session.execute(text('ALTER TABLE chat ADD COLUMN created_at DATETIME'))
             db.session.commit()
 
         if inspector.has_table('post'):
@@ -392,6 +547,12 @@ def init_db():
             columns = [row[1] for row in result]
             if 'image_path' not in columns:
                 db.session.execute(text("ALTER TABLE post ADD COLUMN image_path VARCHAR(255)"))
+            if 'sentiment_score' not in columns:
+                db.session.execute(text("ALTER TABLE post ADD COLUMN sentiment_score FLOAT NOT NULL DEFAULT 0.0"))
+            if 'sentiment_label' not in columns:
+                db.session.execute(text("ALTER TABLE post ADD COLUMN sentiment_label VARCHAR(30) NOT NULL DEFAULT 'Neutral'"))
+            if 'created_at' not in columns:
+                db.session.execute(text("ALTER TABLE post ADD COLUMN created_at DATETIME"))
             db.session.commit()
 
 init_db()
@@ -422,6 +583,9 @@ def load_user(user_id):
 
 @app.route('/')
 def home():
+
+    if current_user.is_authenticated:
+        return redirect(url_for('menu'))
 
     return render_template('index.html')
 
@@ -478,13 +642,13 @@ def register():
         pending['otp'] = otp
         pending['otp_ts'] = datetime.utcnow().timestamp()
 
-        session['pending_registration'] = pending
-
         email_sent = send_email(email, 'Your registration OTP', f'Your OTP is: {otp}')
         if not email_sent:
             flash(mail_setup_message())
 
-        show_otp = app.config.get('SHOW_OTP', False)
+        show_otp = should_show_otp(email_sent)
+        pending['show_otp'] = show_otp
+        session['pending_registration'] = pending
         otp_val = otp if show_otp else None
         return render_template('otp_verify.html', email=email, otp=otp_val, show_otp=show_otp)
 
@@ -543,7 +707,7 @@ def verify_otp():
 
     if entered.strip() != data.get('otp'):
         flash('Invalid OTP')
-        show_otp = app.config.get('SHOW_OTP', False)
+        show_otp = app.config.get('SHOW_OTP', False) or data.get('show_otp', False)
         otp_val = data.get('otp') if show_otp else None
         return render_template('otp_verify.html', email=data.get('email'), otp=otp_val, show_otp=show_otp)
 
@@ -593,7 +757,9 @@ def resend_otp():
         flash('OTP resent')
     else:
         flash(mail_setup_message())
-    show_otp = app.config.get('SHOW_OTP', False)
+    show_otp = should_show_otp(email_sent)
+    data['show_otp'] = show_otp
+    session['pending_registration'] = data
     otp_val = otp if show_otp else None
     return render_template('otp_verify.html', email=data.get('email'), otp=otp_val, show_otp=show_otp)
 
@@ -703,7 +869,7 @@ def login():
 
             login_user(user)
 
-            return redirect(url_for('dashboard'))
+            return redirect(url_for('menu'))
 
         if user:
             flash('Wrong password')
@@ -772,15 +938,17 @@ def post():
 @app.route('/post/<int:post_id>/react', methods=['POST'])
 def react_to_post(post_id):
     if not current_user.is_authenticated:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'message': 'Please log in to react to posts'}), 401
         flash('Please log in to react to posts')
         return redirect(url_for('login'))
 
     action = request.form.get('action')
 
-    if action not in ('like', 'dislike'):
-
+    if action not in REACTION_MAP:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'message': 'Invalid reaction'}), 400
         flash('Invalid reaction')
-
         return redirect(url_for('dashboard'))
 
     post = Post.query.get_or_404(post_id)
@@ -790,18 +958,13 @@ def react_to_post(post_id):
         user_id=current_user.id
     ).first()
 
-    vote_value = 1 if action == 'like' else -1
+    vote_value = REACTION_MAP[action]
 
     if existing_vote and existing_vote.value == vote_value:
-
         db.session.delete(existing_vote)
-
     elif existing_vote:
-
         existing_vote.value = vote_value
-
     else:
-
         db.session.add(
             PostVote(
                 post_id=post.id,
@@ -810,7 +973,27 @@ def react_to_post(post_id):
             )
         )
 
+    db.session.flush()
+    reaction_counts, sentiment_score, sentiment = update_post_sentiment(post)
     db.session.commit()
+
+    updated_vote = PostVote.query.filter_by(
+        post_id=post.id,
+        user_id=current_user.id
+    ).first()
+    user_reaction = next(
+        (reaction for reaction, value in REACTION_MAP.items() if updated_vote and updated_vote.value == value),
+        None
+    )
+
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({
+            'success': True,
+            'reaction_counts': reaction_counts,
+            'user_reaction': user_reaction,
+            'sentiment': sentiment,
+            'sentiment_score': sentiment_score
+        })
 
     return redirect(url_for('dashboard'))
 
@@ -836,6 +1019,28 @@ def comment(post_id):
 
     return redirect(url_for('dashboard'))
 
+
+@app.route('/post/<int:post_id>/delete', methods=['POST'])
+@login_required
+def delete_post(post_id):
+    post = Post.query.get_or_404(post_id)
+
+    if not can_delete_post(post):
+        flash('You can only delete your own posts.')
+        return redirect(url_for('dashboard'))
+
+    image_path = post.image_path
+    db.session.delete(post)
+    db.session.commit()
+
+    if image_path:
+        full_path = os.path.join(app.static_folder, image_path.replace('/', os.sep))
+        if os.path.isfile(full_path):
+            os.remove(full_path)
+
+    flash('Post deleted')
+    return redirect(url_for('dashboard'))
+
 # ==========================================
 # DASHBOARD
 # ==========================================
@@ -857,20 +1062,28 @@ def dashboard():
     post_data = []
 
     for post in posts:
+        reaction_counts, sentiment_score, sentiment_label = update_post_sentiment(post)
 
-        likes = sum(1 for vote in post.votes if vote.value == 1)
-
-        dislikes = sum(1 for vote in post.votes if vote.value == -1)
+        user_vote = user_votes.get(post.id)
+        user_reaction = next(
+            (action for action, value in REACTION_MAP.items() if user_vote == value),
+            None
+        )
 
         post_data.append(
             {
                 'post': post,
-                'likes': likes,
-                'dislikes': dislikes,
-                'user_vote': user_votes.get(post.id),
-                'comments': sorted(post.comments, key=lambda c: c.created_at)
+                'reaction_counts': reaction_counts,
+                'user_vote': user_vote,
+                'user_reaction': user_reaction,
+                'sentiment_score': sentiment_score,
+                'sentiment_label': sentiment_label,
+                'comments': sorted(post.comments, key=lambda c: c.created_at),
+                'can_delete': can_delete_post(post)
             }
         )
+
+    db.session.commit()
 
     user_display = current_user.username if current_user.is_authenticated else 'Guest'
     return render_template(
@@ -909,14 +1122,24 @@ def diary():
 
         db.session.commit()
 
-    entries = Diary.query.filter_by(
-        user_id=current_user.id
-    ).order_by(Diary.date.desc()).all()
+    if is_admin_user():
+        entries = Diary.query.order_by(Diary.date.desc()).all()
+    else:
+        entries = Diary.query.filter_by(
+            user_id=current_user.id
+        ).order_by(Diary.date.desc()).all()
+
+    users_by_id = {
+        user.id: user
+        for user in User.query.all()
+    } if is_admin_user() else {}
 
     return render_template(
         'diary.html',
         entries=entries,
-        user=current_user.username
+        users_by_id=users_by_id,
+        user=current_user.username,
+        is_admin=is_admin_user()
     )
 
 # ==========================================
@@ -935,9 +1158,9 @@ def chat():
             original = Chat.query.get(int(reply_to))
 
             if original:
-                reply_sender = 'Admin' if current_user.username.lower() == 'admin' else current_user.username
+                reply_sender = 'Admin' if is_admin_user() else current_user.username
                 new_message = Chat(
-                    message=f"Reply to {original.sender}: {reply_text}",
+                    message=reply_text,
                     sender=reply_sender,
                     user_id=original.user_id,
                     recipient=original.sender,
@@ -960,7 +1183,7 @@ def chat():
         db.session.commit()
 
     # Fetch messages visible to this user
-    if current_user.username.lower() == 'admin':
+    if is_admin_user():
         all_messages = Chat.query.order_by(Chat.id.asc()).all()
     else:
         all_messages = Chat.query.filter_by(
@@ -978,7 +1201,8 @@ def chat():
         'chat.html',
         originals=originals,
         replies_map=replies_map,
-        user=current_user.username
+        user=current_user.username,
+        is_admin=is_admin_user()
     )
 
 # ==========================================
@@ -987,7 +1211,7 @@ def chat():
 @app.route('/database')
 @login_required
 def database_view():
-    if current_user.username.lower() != 'admin':
+    if not is_admin_user():
         flash('Database view is admin only.')
         return redirect(url_for('dashboard'))
 
@@ -996,12 +1220,82 @@ def database_view():
     diary_entries = Diary.query.order_by(Diary.date.desc()).all()
     chats = Chat.query.order_by(Chat.id.desc()).all()
 
+    for post in posts:
+        update_post_sentiment(post)
+    db.session.commit()
+
     return render_template(
         'database.html',
         users=users,
         posts=posts,
         diary_entries=diary_entries,
         chats=chats,
+        user=current_user.username
+    )
+
+# ==========================================
+# SENTIMENT ANALYSIS VIEW
+# ==========================================
+
+@app.route('/sentiment-analysis')
+@login_required
+def sentiment_analysis():
+    if not is_admin_user():
+        flash('Sentiment analysis is admin only.')
+        return redirect(url_for('dashboard'))
+
+    posts = Post.query.order_by(Post.id.desc()).all()
+    sentiment_items = []
+    positive_count = 0
+    negative_count = 0
+    neutral_count = 0
+    total_score = 0
+
+    for post in posts:
+        reaction_counts, sentiment_score, sentiment = update_post_sentiment(post)
+        total_votes = sum(reaction_counts.values())
+        total_score += sentiment_score
+
+        if sentiment == 'Positive':
+            positive_count += 1
+        elif sentiment == 'Negative':
+            negative_count += 1
+        else:
+            neutral_count += 1
+
+        sentiment_items.append(
+            {
+                'post': post,
+                'reaction_counts': reaction_counts,
+                'total_votes': total_votes,
+                'sentiment': sentiment,
+                'sentiment_score': sentiment_score,
+            }
+        )
+
+    db.session.commit()
+
+    total_posts = len(sentiment_items)
+    positive_percent = round((positive_count / total_posts) * 100) if total_posts else 0
+    negative_percent = round((negative_count / total_posts) * 100) if total_posts else 0
+    neutral_percent = round((neutral_count / total_posts) * 100) if total_posts else 0
+    average_score = round(total_score / total_posts, 2) if total_posts else 0.0
+    overall_label = sentiment_label_for_score(average_score)
+
+    return render_template(
+        'sentiment_analysis.html',
+        posts=sentiment_items,
+        positive_count=positive_count,
+        negative_count=negative_count,
+        neutral_count=neutral_count,
+        positive_percent=positive_percent,
+        negative_percent=negative_percent,
+        neutral_percent=neutral_percent,
+        average_score=average_score,
+        overall_label=overall_label,
+        reaction_score_lookup=REACTION_SCORE_LOOKUP,
+        sentiment_scale=SENTIMENT_SCALE,
+        total_posts=total_posts,
         user=current_user.username
     )
 

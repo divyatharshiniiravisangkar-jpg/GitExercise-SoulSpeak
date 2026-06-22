@@ -3,25 +3,37 @@
 {% block title %}Register{% endblock %}
 
 {% block content %}
-<h2>Register</h2>
+<main class="app-page auth-page">
+    <section class="auth-shell">
+        <div class="auth-copy">
+            <p class="eyebrow">Start here</p>
+            <h1>Create your SoulSpeak account.</h1>
+            <p>Keep your reflections, share posts, and join conversations in a calm place made for honest thoughts.</p>
+        </div>
 
-<form method="POST" action="{{ url_for('register') }}">
-    <input type="text" name="username" placeholder="Username" required><br><br>
-    <input type="email" name="email" placeholder="Email" required><br><br>
-    <input type="password" name="password" placeholder="Password" required><br><br>
+        <div class="form-container auth-card">
+            <h2>Register</h2>
+            <form method="POST" action="{{ url_for('register') }}">
+                <input type="text" name="username" placeholder="Username" required>
+                <input type="email" name="email" placeholder="Email" required>
+                <input type="password" name="password" placeholder="Password" required>
 
-    <label for="security_question">Security question</label><br>
-    <select name="security_question" id="security_question" required>
-        <option value="What was your first pet's name?">What was your first pet's name?</option>
-        <option value="What is your mother's name?">What is your mother's name?</option>
-        <option value="What is the name of your elementary school?">What is the name of your elementary school?</option>
-        <option value="What is your favorite book?">What is your favorite book?</option>
-    </select><br><br>
+                <label for="security_question">Security question</label>
+                <select name="security_question" id="security_question" required>
+                    <option value="What was your first pet's name?">What was your first pet's name?</option>
+                    <option value="What is your mother's name?">What is your mother's name?</option>
+                    <option value="What is the name of your elementary school?">What is the name of your elementary school?</option>
+                    <option value="What is your favorite book?">What is your favorite book?</option>
+                </select>
 
-    <input type="text" name="security_answer" placeholder="Answer to security question" required><br><br>
+                <input type="text" name="security_answer" placeholder="Answer to security question" required>
+                <button class="btn" type="submit">Register</button>
+            </form>
 
-    <button type="submit">Register</button>
-</form>
-
-<p><a href="{{ url_for('login') }}">Go to Login</a></p>
+            <div class="form-links">
+                <a href="{{ url_for('login') }}">Already have an account?</a>
+            </div>
+        </div>
+    </section>
+</main>
 {% endblock %}

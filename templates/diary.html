@@ -3,42 +3,40 @@
 {% block title %}Diary{% endblock %}
 
 {% block content %}
-    <h1>Personal Diary</h1>
-
-    <nav>
-        <a href="{{ url_for('menu') }}">Menu</a> |
-        <a href="{{ url_for('dashboard') }}">Dashboard</a> |
-        <a href="{{ url_for('post') }}">Create Post</a> |
-        <a href="{{ url_for('chat') }}">Chat</a> |
-        <a href="{{ url_for('diary') }}">Diary</a> |
-        {% if user.lower() != 'guest' %}
-            {% if user.lower() == 'admin' %}
-                <a href="{{ url_for('database_view') }}">Database</a> |
-            {% endif %}
-            <a href="{{ url_for('logout') }}">Logout</a>
-        {% else %}
-            <a href="{{ url_for('login') }}">Login</a> |
-            <a href="{{ url_for('register') }}">Register</a>
-        {% endif %}
-    </nav>
-
-    <form method="POST" class="diary-form">
-        <textarea name="content" rows="6" placeholder="Write your diary entry..." required></textarea>
-        <button type="submit">Save Entry</button>
-    </form>
-
-    <h2>Diary Entries</h2>
-
-    {% if entries %}
-        <div class="entries">
-            {% for entry in entries %}
-                <article class="entry-card">
-                    <div class="entry-meta">Posted on {{ entry.date.strftime('%Y-%m-%d %H:%M') if entry.date else 'Unknown' }}</div>
-                    <p>{{ entry.content }}</p>
-                </article>
-            {% endfor %}
+<main class="app-page">
+    <section class="diary-entry">
+        <div class="page-heading compact-heading">
+            <p class="eyebrow">Private space</p>
+            <h1>{% if is_admin %}All Diaries{% else %}Personal Diary{% endif %}</h1>
+            <p>{% if is_admin %}Read diary entries shared through SoulSpeak.{% else %}Write what you need to put down. Your entries stay here for you.{% endif %}</p>
         </div>
-    {% else %}
-        <p>You have no diary entries yet.</p>
-    {% endif %}
+
+        <form method="POST" class="diary-form">
+            <textarea name="content" rows="6" placeholder="Write your diary entry..." required></textarea>
+            <button class="btn" type="submit">Save Entry</button>
+        </form>
+
+        <div class="section-title-row">
+            <h2>Diary Entries</h2>
+            <span>{{ entries|length if entries else 0 }} saved</span>
+        </div>
+
+        {% if entries %}
+            <div class="entries">
+                {% for entry in entries %}
+                    <article class="entry-card">
+                        {% if is_admin %}
+                            {% set entry_user = users_by_id.get(entry.user_id) %}
+                            <div class="entry-meta">By {{ entry_user.username if entry_user else 'Unknown user' }}</div>
+                        {% endif %}
+                        <div class="entry-meta">Posted on {{ entry.date.strftime('%Y-%m-%d %H:%M') if entry.date else 'Unknown' }}</div>
+                        <p>{{ entry.content }}</p>
+                    </article>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="empty-state">You have no diary entries yet.</p>
+        {% endif %}
+    </section>
+</main>
 {% endblock %}

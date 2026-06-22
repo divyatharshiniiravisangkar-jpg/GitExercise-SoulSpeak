@@ -1,12 +1,28 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>SoulSpeak</title>
-</head>
-<body>
-    <h1>Welcome to SoulSpeak 💙</h1>
+{% extends "base.html" %}
 
-    <a href="{{ url_for('login') }}">Login</a> |
-    <a href="{{ url_for('register') }}">Register</a>
-</body>
-</html>
+{% block title %}SoulSpeak{% endblock %}
+
+{% block content %}
+<main class="home-page">
+    <section class="hero">
+        <div class="hero-text">
+            <p class="eyebrow">SOULSPEAK</p>
+            <h1>Your inner voice has room here.</h1>
+            <p>Share your thoughts, journal your feelings, and connect with a space made for reflection.</p>
+            <div class="hero-actions">
+                <a href="{{ url_for('login') }}" class="nav-btn nav-btn-dashboard">Login</a>
+                <a href="{{ url_for('register') }}" class="nav-btn nav-btn-diary">Register</a>
+            </div>
+        </div>
+        <div class="hero-logo">
+            <img src="{{ url_for('static', filename='images/soulspeak-logo.svg') }}" alt="SoulSpeak logo">
+        </div>
+    </section>
+
+    <section class="cards single-caption-section">
+        <a href="{{ url_for('login') }}" class="card caption-card">
+            <p class="caption-text">SEARCH THE SOLUTION HERE</p>
+        </a>
+    </section>
+</main>
+{% endblock %}
