@@ -149,6 +149,27 @@ def can_delete_post(post, user=None):
     return is_admin_user(user) or post.user_id == user.id
 
 
+def can_delete_diary(entry, user=None):
+    user = user or current_user
+    if not getattr(user, 'is_authenticated', False):
+        return False
+
+    return is_admin_user(user) or entry.user_id == user.id
+
+
+def can_delete_chat(message, user=None):
+    user = user or current_user
+    if not getattr(user, 'is_authenticated', False):
+        return False
+
+    if is_admin_user(user):
+        return True
+
+    sender = (message.sender or '').strip().lower()
+    username = (user.username or '').strip().lower()
+    return message.user_id == user.id and sender == username
+
+
 @app.context_processor
 def inject_admin_status():
     return {'is_admin': is_admin_user()}
@@ -524,6 +545,8 @@ class Chat(db.Model):
         default=datetime.utcnow
     )
 
+    user = db.relationship('User', backref='chats')
+
 
 def init_db():
     with app.app_context():
@@ -556,6 +579,31 @@ def init_db():
             db.session.commit()
 
 init_db()
+
+
+def repair_chat_user_ids():
+    users_by_name = {
+        (user.username or '').strip().lower(): user
+        for user in User.query.all()
+    }
+
+    changed = False
+    for message in Chat.query.filter(Chat.user_id.is_(None)).all():
+        sender_name = (message.sender or '').strip().lower()
+        recipient_name = (message.recipient or '').strip().lower()
+
+        matched_user = None
+        if sender_name != 'admin':
+            matched_user = users_by_name.get(sender_name)
+        if not matched_user and recipient_name != 'admin':
+            matched_user = users_by_name.get(recipient_name)
+
+        if matched_user:
+            message.user_id = matched_user.id
+            changed = True
+
+    if changed:
+        db.session.commit()
 
 
 def ensure_user_columns():
@@ -1109,7 +1157,9 @@ def menu():
 @login_required
 def diary():
 
-    if request.method == 'POST':
+    admin_view = is_admin_user()
+
+    if request.method == 'POST' and not admin_view:
 
         content = request.form['content']
 
@@ -1122,8 +1172,29 @@ def diary():
 
         db.session.commit()
 
-    if is_admin_user():
-        entries = Diary.query.order_by(Diary.date.desc()).all()
+    diary_users = []
+    selected_diary_user = None
+    selected_diary_user_id = request.args.get('user_id', type=int)
+
+    if admin_view:
+        diary_user_ids = [
+            row[0]
+            for row in db.session.query(Diary.user_id)
+            .filter(Diary.user_id.isnot(None))
+            .distinct()
+            .all()
+        ]
+        diary_users = User.query.filter(User.id.in_(diary_user_ids)).order_by(User.username.asc()).all() if diary_user_ids else []
+
+        entries_query = Diary.query
+        if selected_diary_user_id:
+            selected_diary_user = User.query.get(selected_diary_user_id)
+            if selected_diary_user:
+                entries_query = entries_query.filter_by(user_id=selected_diary_user.id)
+            else:
+                flash('Selected diary user was not found.')
+                return redirect(url_for('diary'))
+        entries = entries_query.order_by(Diary.date.desc()).all()
     else:
         entries = Diary.query.filter_by(
             user_id=current_user.id
@@ -1137,10 +1208,31 @@ def diary():
     return render_template(
         'diary.html',
         entries=entries,
+        diary_users=diary_users,
+        selected_diary_user=selected_diary_user,
         users_by_id=users_by_id,
         user=current_user.username,
-        is_admin=is_admin_user()
+        is_admin=admin_view
     )
+
+
+@app.route('/diary/<int:entry_id>/delete', methods=['POST'])
+@login_required
+def delete_diary(entry_id):
+    entry = Diary.query.get_or_404(entry_id)
+    entry_user_id = entry.user_id
+
+    if not can_delete_diary(entry):
+        flash('You can only delete your own diary entries.')
+        return redirect(url_for('diary'))
+
+    db.session.delete(entry)
+    db.session.commit()
+
+    flash('Diary entry deleted.')
+    if is_admin_user() and entry_user_id:
+        return redirect(url_for('diary', user_id=entry_user_id))
+    return redirect(url_for('diary'))
 
 # ==========================================
 # CHAT ROOM
@@ -1149,6 +1241,8 @@ def diary():
 @app.route('/chat', methods=['GET', 'POST'])
 @login_required
 def chat():
+    admin_view = is_admin_user()
+    repair_chat_user_ids()
 
     if request.method == 'POST':
 
@@ -1158,12 +1252,21 @@ def chat():
             original = Chat.query.get(int(reply_to))
 
             if original:
-                reply_sender = 'Admin' if is_admin_user() else current_user.username
+                if admin_view and not original.user_id:
+                    flash('This message is not linked to a user account yet.')
+                    return redirect(url_for('chat'))
+
+                if not admin_view and original.user_id != current_user.id:
+                    flash('You can only reply in your own chat.')
+                    return redirect(url_for('chat'))
+
+                reply_sender = 'Admin' if admin_view else current_user.username
+                reply_recipient = original.user.username if admin_view and original.user else original.sender
                 new_message = Chat(
                     message=reply_text,
                     sender=reply_sender,
                     user_id=original.user_id,
-                    recipient=original.sender,
+                    recipient=reply_recipient,
                     reply_to=original.id
                 )
             else:
@@ -1171,20 +1274,63 @@ def chat():
                 return redirect(url_for('chat'))
         else:
             message = request.form['message']
-            new_message = Chat(
-                message=message,
-                sender=current_user.username,
-                user_id=current_user.id,
-                recipient='Admin'
-            )
+            selected_user_id = request.form.get('selected_user_id', type=int)
+
+            if admin_view:
+                selected_user = User.query.get(selected_user_id) if selected_user_id else None
+                if not selected_user:
+                    flash('Choose a user before sending a chat reply.')
+                    return redirect(url_for('chat'))
+
+                new_message = Chat(
+                    message=message,
+                    sender='Admin',
+                    user_id=selected_user.id,
+                    recipient=selected_user.username
+                )
+            else:
+                new_message = Chat(
+                    message=message,
+                    sender=current_user.username,
+                    user_id=current_user.id,
+                    recipient='Admin'
+                )
 
         db.session.add(new_message)
 
         db.session.commit()
+        if admin_view:
+            return redirect(url_for('chat', user_id=new_message.user_id))
 
     # Fetch messages visible to this user
-    if is_admin_user():
-        all_messages = Chat.query.order_by(Chat.id.asc()).all()
+    chat_users = []
+    selected_chat_user = None
+
+    if admin_view:
+        chat_user_ids = [
+            row[0]
+            for row in db.session.query(Chat.user_id)
+            .filter(Chat.user_id.isnot(None))
+            .distinct()
+            .all()
+        ]
+        chat_users = User.query.filter(User.id.in_(chat_user_ids)).order_by(User.username.asc()).all() if chat_user_ids else []
+
+        selected_user_id = request.args.get('user_id', type=int)
+        if selected_user_id:
+            selected_chat_user = User.query.get(selected_user_id)
+            if not selected_chat_user:
+                flash('Selected chat user was not found.')
+                return redirect(url_for('chat'))
+        elif chat_users:
+            selected_chat_user = chat_users[0]
+
+        if selected_chat_user:
+            all_messages = Chat.query.filter_by(
+                user_id=selected_chat_user.id
+            ).order_by(Chat.id.asc()).all()
+        else:
+            all_messages = []
     else:
         all_messages = Chat.query.filter_by(
             user_id=current_user.id
@@ -1201,9 +1347,35 @@ def chat():
         'chat.html',
         originals=originals,
         replies_map=replies_map,
+        chat_users=chat_users,
+        selected_chat_user=selected_chat_user,
         user=current_user.username,
-        is_admin=is_admin_user()
+        is_admin=admin_view
     )
+
+
+@app.route('/chat/<int:message_id>/delete', methods=['POST'])
+@login_required
+def delete_chat(message_id):
+    message = Chat.query.get_or_404(message_id)
+    message_user_id = message.user_id
+
+    if not can_delete_chat(message):
+        flash('You can only delete chat messages you sent.')
+        return redirect(url_for('chat'))
+
+    if message.reply_to:
+        db.session.delete(message)
+    else:
+        Chat.query.filter_by(reply_to=message.id).delete()
+        db.session.delete(message)
+
+    db.session.commit()
+
+    flash('Chat message deleted.')
+    if is_admin_user() and message_user_id:
+        return redirect(url_for('chat', user_id=message_user_id))
+    return redirect(url_for('chat'))
 
 # ==========================================
 # DATABASE VIEW
