@@ -26,7 +26,7 @@ import uuid
 
 from flask_login import current_user
 
-from datetime import datetime
+from datetime import datetime, timedelta
 import random
 import smtplib
 import ssl
@@ -173,6 +173,14 @@ def can_delete_chat(message, user=None):
 @app.context_processor
 def inject_admin_status():
     return {'is_admin': is_admin_user()}
+
+
+@app.template_filter('malaysia_time')
+def malaysia_time(value, fmt='%I:%M %p'):
+    if not value:
+        return ''
+
+    return (value + timedelta(hours=8)).strftime(fmt)
 
 
 def send_email(to_addr, subject, body):
@@ -1177,6 +1185,7 @@ def diary():
         db.session.add(entry)
 
         db.session.commit()
+        return redirect(url_for('diary'))
 
     diary_users = []
     selected_diary_user = None
@@ -1307,6 +1316,7 @@ def chat():
         db.session.commit()
         if admin_view:
             return redirect(url_for('chat', user_id=new_message.user_id))
+        return redirect(url_for('chat'))
 
     # Fetch messages visible to this user
     chat_users = []

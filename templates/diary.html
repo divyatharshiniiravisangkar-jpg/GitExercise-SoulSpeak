@@ -44,7 +44,7 @@
                                     {% set entry_user = users_by_id.get(entry.user_id) %}
                                     <div class="entry-meta">By {{ entry_user.username if entry_user else 'Unknown user' }}</div>
                                 {% endif %}
-                                <div class="entry-meta">Posted on {{ entry.date.strftime('%Y-%m-%d %H:%M') if entry.date else 'Unknown' }}</div>
+                                <div class="entry-meta">Posted on {{ entry.date|malaysia_time('%Y-%m-%d %I:%M %p') if entry.date else 'Unknown' }}</div>
                             </div>
                             <form method="POST" action="{{ url_for('delete_diary', entry_id=entry.id) }}">
                                 <button type="submit" class="danger-text-btn">Delete</button>

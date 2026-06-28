@@ -64,7 +64,7 @@
                                 <div class="message-body">
                                     <div class="message-meta">
                                         <strong>{{ msg.sender or 'User' }}</strong>
-                                        <span>{{ msg.created_at.strftime('%I:%M %p') if msg.created_at is defined and msg.created_at else '' }}</span>
+                                        <span>{{ msg.created_at|malaysia_time if msg.created_at is defined and msg.created_at else '' }}</span>
                                         {% if is_admin or msg.sender == user %}
                                             <form method="POST" action="{{ url_for('delete_chat', message_id=msg.id) }}">
                                                 <button type="submit" class="message-delete-btn">Delete</button>
@@ -88,7 +88,7 @@
                                         <div class="message-body">
                                             <div class="message-meta">
                                                 <strong>{{ reply.sender or 'User' }}{% if reply_is_admin %}<span class="verified-dot">OK</span>{% endif %}</strong>
-                                                <span>{{ reply.created_at.strftime('%I:%M %p') if reply.created_at is defined and reply.created_at else '' }}</span>
+                                                <span>{{ reply.created_at|malaysia_time if reply.created_at is defined and reply.created_at else '' }}</span>
                                                 {% if is_admin or reply.sender == user %}
                                                     <form method="POST" action="{{ url_for('delete_chat', message_id=reply.id) }}">
                                                         <button type="submit" class="message-delete-btn">Delete</button>
