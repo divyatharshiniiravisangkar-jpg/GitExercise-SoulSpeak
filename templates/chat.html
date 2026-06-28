@@ -130,5 +130,20 @@
             {% endif %}
         </div>
     </section>
+
+    <script>
+        const chatRefreshMs = 5000;
+
+        function hasDraftText() {
+            return Array.from(document.querySelectorAll('.chat-compose input, .reply-form input'))
+                .some((input) => input === document.activeElement || input.value.trim().length > 0);
+        }
+
+        window.setInterval(() => {
+            if (!hasDraftText()) {
+                window.location.reload();
+            }
+        }, chatRefreshMs);
+    </script>
 </main>
 {% endblock %}
