@@ -110,7 +110,7 @@ load_env_file()
 
 app = Flask(__name__, instance_relative_config=True)
 
-app.config['SECRET_KEY'] = 'soulspeaksecret'
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'soulspeaksecret')
 
 # Mail settings can be supplied via environment variables for real email delivery
 app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
@@ -274,7 +274,13 @@ def mail_setup_message():
     return 'OTP email could not be sent. Check your MAIL settings in .env.'
 
 os.makedirs(app.instance_path, exist_ok=True)
-app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(app.instance_path, 'database.db')}"
+database_url = os.environ.get('DATABASE_URL')
+if database_url:
+    if database_url.startswith('postgres://'):
+        database_url = database_url.replace('postgres://', 'postgresql://', 1)
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+else:
+    app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(app.instance_path, 'database.db')}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)

@@ -6,6 +6,11 @@ venv/
 
 # Local DB
 soulspeak.db
+users.db
+instance/*.db
+instance/*.log
+server*.err
+server*.out
 
 # Editor
 .vscode/
