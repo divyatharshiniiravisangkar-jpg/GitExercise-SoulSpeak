@@ -30,6 +30,7 @@ from datetime import datetime, timedelta
 import random
 import smtplib
 import ssl
+import threading
 from email.message import EmailMessage
 
 REACTION_MAP = {
@@ -124,9 +125,8 @@ app.config['ADMIN_EMAILS'] = {
     if email.strip()
 }
 
-# Developer helper: show OTP on the verification page when enabled.
-# If email delivery fails, show the OTP so registration can still complete.
-app.config['SHOW_OTP'] = os.environ.get('SHOW_OTP', '0').strip().lower() in ('1', 'true', 'yes')
+# Show OTP on the verification page by default so Render/Gmail issues cannot block registration.
+app.config['SHOW_OTP'] = os.environ.get('SHOW_OTP', '1').strip().lower() in ('1', 'true', 'yes')
 
 
 def should_show_otp(email_sent=False):
@@ -261,6 +261,15 @@ def send_email(to_addr, subject, body):
         except Exception:
             pass
         return False
+
+
+def send_email_async(to_addr, subject, body):
+    def worker():
+        with app.app_context():
+            send_email(to_addr, subject, body)
+
+    thread = threading.Thread(target=worker, daemon=True)
+    thread.start()
 
 
 def mail_setup_message():
@@ -707,11 +716,10 @@ def register():
         pending['otp'] = otp
         pending['otp_ts'] = datetime.utcnow().timestamp()
 
-        email_sent = send_email(email, 'Your registration OTP', f'Your OTP is: {otp}')
-        if not email_sent:
-            flash(mail_setup_message())
+        send_email_async(email, 'Your registration OTP', f'Your OTP is: {otp}')
+        flash('Use the OTP shown below to finish registration. If email is configured correctly, it will also arrive in your inbox.')
 
-        show_otp = should_show_otp(email_sent)
+        show_otp = should_show_otp(False)
         pending['show_otp'] = show_otp
         session['pending_registration'] = pending
         otp_val = otp if show_otp else None
@@ -816,13 +824,10 @@ def resend_otp():
     data['otp_ts'] = datetime.utcnow().timestamp()
     session['pending_registration'] = data
 
-    email_sent = send_email(data['email'], 'Your registration OTP (resend)', f'Your OTP is: {otp}')
+    send_email_async(data['email'], 'Your registration OTP (resend)', f'Your OTP is: {otp}')
+    flash('New OTP generated. Use the OTP shown below to finish registration.')
 
-    if email_sent:
-        flash('OTP resent')
-    else:
-        flash(mail_setup_message())
-    show_otp = should_show_otp(email_sent)
+    show_otp = should_show_otp(False)
     data['show_otp'] = show_otp
     session['pending_registration'] = data
     otp_val = otp if show_otp else None
