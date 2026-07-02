@@ -101,6 +101,13 @@ button:hover,
     box-shadow: 0 0 25px rgba(79, 209, 197, 0.6);
 }
 
+button:disabled,
+.btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.65;
+    transform: none;
+}
+
 .navbar,
 .hero,
 .form-container,

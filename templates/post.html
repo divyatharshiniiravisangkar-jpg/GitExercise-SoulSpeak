@@ -13,7 +13,8 @@
 
         <div class="form-container auth-card">
             <h2>Share Your Feelings</h2>
-            <form method="POST" enctype="multipart/form-data">
+            <form method="POST" enctype="multipart/form-data" class="post-create-form">
+                <input type="hidden" name="post_token" value="{{ post_token }}">
                 <textarea name="content" rows="6" placeholder="Write something..." required></textarea>
                 <label for="image">Upload an image</label>
                 <input type="file" name="image" id="image" accept="image/*">
@@ -22,4 +23,15 @@
         </div>
     </section>
 </main>
+<script>
+    document.querySelectorAll('.post-create-form').forEach((form) => {
+        form.addEventListener('submit', () => {
+            const submitButton = form.querySelector('button[type="submit"]');
+            if (submitButton) {
+                submitButton.disabled = true;
+                submitButton.textContent = 'Posting...';
+            }
+        });
+    });
+</script>
 {% endblock %}

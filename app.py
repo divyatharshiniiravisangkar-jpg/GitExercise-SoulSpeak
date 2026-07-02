@@ -154,7 +154,7 @@ def can_delete_diary(entry, user=None):
     if not getattr(user, 'is_authenticated', False):
         return False
 
-    return is_admin_user(user) or entry.user_id == user.id
+    return entry.user_id == user.id
 
 
 def can_delete_chat(message, user=None):
@@ -961,6 +961,16 @@ def post():
 
     if request.method == 'POST':
 
+        post_token = request.form.get('post_token')
+        valid_tokens = session.get('post_tokens', [])
+
+        if not post_token or post_token not in valid_tokens:
+            flash('That post was already submitted.')
+            return redirect(url_for('dashboard'))
+
+        valid_tokens.remove(post_token)
+        session['post_tokens'] = valid_tokens
+
         content = request.form['content']
         image = request.files.get('image')
         image_path = None
@@ -991,9 +1001,15 @@ def post():
         return redirect(url_for('dashboard'))
 
     user_display = current_user.username if current_user.is_authenticated else 'Anonymous'
+    post_token = uuid.uuid4().hex
+    session.setdefault('post_tokens', [])
+    session['post_tokens'].append(post_token)
+    session.modified = True
+
     return render_template(
         'post.html',
-        user=user_display
+        user=user_display,
+        post_token=post_token
     )
 
 
@@ -1170,10 +1186,23 @@ def menu():
 @app.route('/diary', methods=['GET', 'POST'])
 @login_required
 def diary():
-
     admin_view = is_admin_user()
 
-    if request.method == 'POST' and not admin_view:
+    if admin_view:
+        diary_users = db.session.query(User).join(
+            Diary,
+            Diary.user_id == User.id
+        ).distinct().order_by(User.username.asc()).all()
+
+        return render_template(
+            'diary.html',
+            entries=[],
+            diary_users=diary_users,
+            user=current_user.username,
+            is_admin=True
+        )
+
+    if request.method == 'POST':
 
         content = request.form['content']
 
@@ -1187,47 +1216,15 @@ def diary():
         db.session.commit()
         return redirect(url_for('diary'))
 
-    diary_users = []
-    selected_diary_user = None
-    selected_diary_user_id = request.args.get('user_id', type=int)
-
-    if admin_view:
-        diary_user_ids = [
-            row[0]
-            for row in db.session.query(Diary.user_id)
-            .filter(Diary.user_id.isnot(None))
-            .distinct()
-            .all()
-        ]
-        diary_users = User.query.filter(User.id.in_(diary_user_ids)).order_by(User.username.asc()).all() if diary_user_ids else []
-
-        entries_query = Diary.query
-        if selected_diary_user_id:
-            selected_diary_user = User.query.get(selected_diary_user_id)
-            if selected_diary_user:
-                entries_query = entries_query.filter_by(user_id=selected_diary_user.id)
-            else:
-                flash('Selected diary user was not found.')
-                return redirect(url_for('diary'))
-        entries = entries_query.order_by(Diary.date.desc()).all()
-    else:
-        entries = Diary.query.filter_by(
-            user_id=current_user.id
-        ).order_by(Diary.date.desc()).all()
-
-    users_by_id = {
-        user.id: user
-        for user in User.query.all()
-    } if is_admin_user() else {}
+    entries = Diary.query.filter_by(
+        user_id=current_user.id
+    ).order_by(Diary.date.desc()).all()
 
     return render_template(
         'diary.html',
         entries=entries,
-        diary_users=diary_users,
-        selected_diary_user=selected_diary_user,
-        users_by_id=users_by_id,
         user=current_user.username,
-        is_admin=admin_view
+        is_admin=False
     )
 
 
@@ -1235,7 +1232,6 @@ def diary():
 @login_required
 def delete_diary(entry_id):
     entry = Diary.query.get_or_404(entry_id)
-    entry_user_id = entry.user_id
 
     if not can_delete_diary(entry):
         flash('You can only delete your own diary entries.')
@@ -1245,8 +1241,6 @@ def delete_diary(entry_id):
     db.session.commit()
 
     flash('Diary entry deleted.')
-    if is_admin_user() and entry_user_id:
-        return redirect(url_for('diary', user_id=entry_user_id))
     return redirect(url_for('diary'))
 
 # ==========================================
@@ -1338,8 +1332,6 @@ def chat():
             if not selected_chat_user:
                 flash('Selected chat user was not found.')
                 return redirect(url_for('chat'))
-        elif chat_users:
-            selected_chat_user = chat_users[0]
 
         if selected_chat_user:
             all_messages = Chat.query.filter_by(
@@ -1405,8 +1397,14 @@ def database_view():
 
     users = User.query.all()
     posts = Post.query.order_by(Post.id.desc()).all()
-    diary_entries = Diary.query.order_by(Diary.date.desc()).all()
-    chats = Chat.query.order_by(Chat.id.desc()).all()
+    diary_users = db.session.query(User).join(
+        Diary,
+        Diary.user_id == User.id
+    ).distinct().order_by(User.username.asc()).all()
+    chat_users = db.session.query(User).join(
+        Chat,
+        Chat.user_id == User.id
+    ).distinct().order_by(User.username.asc()).all()
 
     for post in posts:
         update_post_sentiment(post)
@@ -1416,8 +1414,8 @@ def database_view():
         'database.html',
         users=users,
         posts=posts,
-        diary_entries=diary_entries,
-        chats=chats,
+        diary_users=diary_users,
+        chat_users=chat_users,
         user=current_user.username
     )
 

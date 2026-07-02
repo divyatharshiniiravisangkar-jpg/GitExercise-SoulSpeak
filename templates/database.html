@@ -30,40 +30,36 @@
     </section>
 
     <section class="widget">
-        <h3>Chat Messages</h3>
+        <h3>Chat Users</h3>
         <table>
             <thead>
-                <tr><th>ID</th><th>Sender</th><th>Recipient</th><th>User ID</th><th>Reply To</th><th>Message</th></tr>
+                <tr><th>Username</th></tr>
             </thead>
             <tbody>
-                {% for msg in chats %}
+                {% for chat_user in chat_users %}
                     <tr>
-                        <td>{{ msg.id }}</td>
-                        <td>{{ msg.sender }}</td>
-                        <td>{{ msg.recipient }}</td>
-                        <td>{{ msg.user_id }}</td>
-                        <td>{{ msg.reply_to }}</td>
-                        <td>{{ msg.message }}</td>
+                        <td><a href="{{ url_for('chat', user_id=chat_user.id) }}">{{ chat_user.username }}</a></td>
                     </tr>
+                {% else %}
+                    <tr><td>No user chats yet.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
     </section>
 
     <section class="widget">
-        <h3>Diary Entries</h3>
+        <h3>Diary Users</h3>
         <table>
             <thead>
-                <tr><th>ID</th><th>User ID</th><th>Date</th><th>Content</th></tr>
+                <tr><th>Username</th></tr>
             </thead>
             <tbody>
-                {% for entry in diary_entries %}
+                {% for diary_user in diary_users %}
                     <tr>
-                        <td>{{ entry.id }}</td>
-                        <td>{{ entry.user_id }}</td>
-                        <td>{{ entry.date.strftime('%Y-%m-%d %H:%M') if entry.date else 'Unknown' }}</td>
-                        <td>{{ entry.content }}</td>
+                        <td>{{ diary_user.username }}</td>
                     </tr>
+                {% else %}
+                    <tr><td>No diary users yet.</td></tr>
                 {% endfor %}
             </tbody>
         </table>

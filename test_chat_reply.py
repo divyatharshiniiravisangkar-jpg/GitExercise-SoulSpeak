@@ -1,6 +1,6 @@
 import unittest
 
-from app import app, db, User, Chat, Diary
+from app import app, db, User, Chat, Diary, Post
 
 
 class ChatReplyTestCase(unittest.TestCase):
@@ -58,6 +58,24 @@ class ChatReplyTestCase(unittest.TestCase):
         self.assertEqual(replies[0].message, 'I am replying now')
         self.assertNotIn('Hello there', replies[0].message)
 
+    def test_post_token_prevents_duplicate_post_submit(self):
+        with self.client.session_transaction() as session:
+            session['_user_id'] = str(self.user.id)
+            session['_fresh'] = True
+            session['post_tokens'] = ['one-time-token']
+
+        data = {
+            'content': 'One photo post',
+            'post_token': 'one-time-token'
+        }
+
+        first_response = self.client.post('/post', data=data, follow_redirects=False)
+        second_response = self.client.post('/post', data=data, follow_redirects=False)
+
+        self.assertEqual(first_response.status_code, 302)
+        self.assertEqual(second_response.status_code, 302)
+        self.assertEqual(Post.query.filter_by(content='One photo post').count(), 1)
+
     def test_admin_chat_shows_user_picker_and_selected_thread(self):
         bob = User(username='bob', email='bob@example.com', password='pw')
         db.session.add(bob)
@@ -88,6 +106,28 @@ class ChatReplyTestCase(unittest.TestCase):
         page = response.get_data(as_text=True)
         self.assertIn('bob@example.com', page)
         self.assertIn('Bob needs help', page)
+        self.assertNotIn('Alice needs help', page)
+
+    def test_admin_chat_does_not_auto_open_a_user_thread(self):
+        message = Chat(
+            message='Alice needs help',
+            sender=self.user.username,
+            user_id=self.user.id,
+            recipient='Admin'
+        )
+        db.session.add(message)
+        db.session.commit()
+
+        with self.client.session_transaction() as session:
+            session['_user_id'] = str(self.admin.id)
+            session['_fresh'] = True
+
+        response = self.client.get('/chat')
+
+        self.assertEqual(response.status_code, 200)
+        page = response.get_data(as_text=True)
+        self.assertIn('Select a user to read chats.', page)
+        self.assertIn('alice@example.com', page)
         self.assertNotIn('Alice needs help', page)
 
     def test_admin_direct_message_targets_selected_user(self):
@@ -174,6 +214,78 @@ class ChatReplyTestCase(unittest.TestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertIsNone(Diary.query.get(entry.id))
+
+    def test_admin_cannot_view_user_diary_entries(self):
+        entry = Diary(content='Alice private thought', user_id=self.user.id)
+        db.session.add(entry)
+        db.session.commit()
+
+        with self.client.session_transaction() as session:
+            session['_user_id'] = str(self.admin.id)
+            session['_fresh'] = True
+
+        response = self.client.get('/diary')
+
+        self.assertEqual(response.status_code, 200)
+        page = response.get_data(as_text=True)
+        self.assertIn('Diary Users', page)
+        self.assertIn('alice', page)
+        self.assertNotIn('Alice private thought', page)
+        self.assertNotIn('Write your diary entry', page)
+        self.assertNotIn('Save Entry', page)
+
+    def test_admin_cannot_delete_user_diary_entry(self):
+        entry = Diary(content='Alice private thought', user_id=self.user.id)
+        db.session.add(entry)
+        db.session.commit()
+        entry_id = entry.id
+
+        with self.client.session_transaction() as session:
+            session['_user_id'] = str(self.admin.id)
+            session['_fresh'] = True
+
+        response = self.client.post(f'/diary/{entry_id}/delete', follow_redirects=False)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIsNotNone(Diary.query.get(entry_id))
+
+    def test_admin_database_does_not_show_diary_entries(self):
+        entry = Diary(content='Alice private thought', user_id=self.user.id)
+        db.session.add(entry)
+        db.session.commit()
+
+        with self.client.session_transaction() as session:
+            session['_user_id'] = str(self.admin.id)
+            session['_fresh'] = True
+
+        response = self.client.get('/database')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'Diary Users', response.data)
+        self.assertIn(b'alice', response.data)
+        self.assertNotIn(b'Alice private thought', response.data)
+
+    def test_admin_database_links_chat_users_without_showing_messages(self):
+        message = Chat(
+            message='Alice needs help',
+            sender=self.user.username,
+            user_id=self.user.id,
+            recipient='Admin'
+        )
+        db.session.add(message)
+        db.session.commit()
+
+        with self.client.session_transaction() as session:
+            session['_user_id'] = str(self.admin.id)
+            session['_fresh'] = True
+
+        response = self.client.get('/database')
+
+        self.assertEqual(response.status_code, 200)
+        page = response.get_data(as_text=True)
+        self.assertIn('Chat Users', page)
+        self.assertIn(f'/chat?user_id={self.user.id}', page)
+        self.assertNotIn('Alice needs help', page)
 
 
 if __name__ == '__main__':
