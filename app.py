@@ -104,6 +104,21 @@ def load_env_file(path='.env'):
 
 load_env_file()
 
+
+def env_first(*names, default=None):
+    for name in names:
+        value = os.environ.get(name)
+        if value is not None and str(value).strip():
+            return value
+    return default
+
+
+def env_flag(name, default=False):
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() in ('1', 'true', 'yes', 'on')
+
 # ==========================================
 # FLASK CONFIGURATION
 # ==========================================
@@ -112,13 +127,15 @@ app = Flask(__name__, instance_relative_config=True)
 
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'soulspeaksecret')
 
-# Mail settings can be supplied via environment variables for real email delivery
-app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
-app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', 587))
-app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
-app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
+# Mail settings can be supplied via environment variables for real email delivery.
+# Common SMTP aliases are accepted so deploy dashboards do not have to use one exact name.
+app.config['MAIL_SERVER'] = env_first('MAIL_SERVER', 'SMTP_SERVER', 'SMTP_HOST', default='smtp.gmail.com')
+app.config['MAIL_PORT'] = int(env_first('MAIL_PORT', 'SMTP_PORT', default=587))
+app.config['MAIL_USERNAME'] = env_first('MAIL_USERNAME', 'EMAIL_USER', 'EMAIL_USERNAME', 'SMTP_USERNAME')
+app.config['MAIL_PASSWORD'] = env_first('MAIL_PASSWORD', 'EMAIL_PASSWORD', 'EMAIL_PASS', 'SMTP_PASSWORD')
 app.config['MAIL_TIMEOUT'] = int(os.environ.get('MAIL_TIMEOUT', 8))
 app.config['LAST_MAIL_ERROR'] = ''
+app.config['OTP_FALLBACK_ON_MAIL_FAILURE'] = env_flag('OTP_FALLBACK_ON_MAIL_FAILURE', True)
 app.config['ADMIN_EMAILS'] = {
     email.strip().lower()
     for email in os.environ.get('ADMIN_EMAILS', 'logananthan02@gmail.com').split(',')
@@ -126,13 +143,15 @@ app.config['ADMIN_EMAILS'] = {
 }
 
 # Only show OTP on-screen for local/debug testing. Production should deliver OTP by email.
-debug_enabled = os.environ.get('FLASK_DEBUG', '0').strip().lower() in ('1', 'true', 'yes')
-show_otp_requested = os.environ.get('SHOW_OTP', '0').strip().lower() in ('1', 'true', 'yes')
+debug_enabled = env_flag('FLASK_DEBUG')
+show_otp_requested = env_flag('SHOW_OTP')
 app.config['SHOW_OTP'] = debug_enabled and show_otp_requested
 
 
 def should_show_otp(email_sent=False):
-    return app.config.get('SHOW_OTP', False)
+    if app.config.get('SHOW_OTP', False):
+        return True
+    return (not email_sent) and app.config.get('OTP_FALLBACK_ON_MAIL_FAILURE', True)
 
 
 def is_admin_user(user=None):
@@ -725,14 +744,16 @@ def register():
         pending['otp_ts'] = datetime.utcnow().timestamp()
 
         email_sent = send_email(email, 'Your registration OTP', f'Your OTP is: {otp}')
-        if not email_sent:
-            flash(mail_setup_message())
-            return redirect(url_for('register'))
-
-        flash('OTP sent to your email. Please check your inbox or spam folder.')
         show_otp = should_show_otp(email_sent)
         pending['show_otp'] = show_otp
         session['pending_registration'] = pending
+        if email_sent:
+            flash('OTP sent to your email. Please check your inbox or spam folder.')
+        elif show_otp:
+            flash(mail_setup_message() + ' Use the OTP shown below to finish registration.')
+        else:
+            flash(mail_setup_message())
+            return redirect(url_for('register'))
         otp_val = otp if show_otp else None
         return render_template('otp_verify.html', email=email, otp=otp_val, show_otp=show_otp)
 
@@ -836,12 +857,14 @@ def resend_otp():
     session['pending_registration'] = data
 
     email_sent = send_email(data['email'], 'Your registration OTP (resend)', f'Your OTP is: {otp}')
+    show_otp = should_show_otp(email_sent)
     if email_sent:
         flash('OTP resent to your email. Please check your inbox or spam folder.')
+    elif show_otp:
+        flash(mail_setup_message() + ' Use the OTP shown below to finish registration.')
     else:
         flash(mail_setup_message())
 
-    show_otp = should_show_otp(email_sent)
     data['show_otp'] = show_otp
     session['pending_registration'] = data
     otp_val = otp if show_otp else None

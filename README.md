@@ -29,9 +29,14 @@ MAIL_PORT=587
 MAIL_TIMEOUT=8
 SHOW_OTP=0
 FLASK_DEBUG=0
+OTP_FALLBACK_ON_MAIL_FAILURE=1
 ```
 
 If `DATABASE_URL` is not set, the app uses local SQLite at `instance/database.db`, which is only suitable for local testing or a small demo.
+
+For Gmail, `MAIL_PASSWORD` must be a 16-character Gmail App Password, not your normal Gmail password. The app also accepts common SMTP aliases such as `EMAIL_USER`, `EMAIL_PASSWORD`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_SERVER`, and `SMTP_PORT`.
+
+`OTP_FALLBACK_ON_MAIL_FAILURE=1` lets users finish registration by showing the OTP on the verification page if email delivery fails. Set it to `0` when SMTP is fully configured and you want OTPs to be email-only.
 
 ## Run Locally
 

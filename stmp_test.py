@@ -22,10 +22,18 @@ def load_env_file(path='.env'):
 
 load_env_file()
 
-mail_server = os.environ.get('MAIL_SERVER', 'smtp.gmail.com').strip()
-mail_port = int(os.environ.get('MAIL_PORT', '587'))
-mail_username = (os.environ.get('MAIL_USERNAME') or '').strip()
-mail_password = (os.environ.get('MAIL_PASSWORD') or '').replace(' ', '').strip()
+def env_first(*names, default=None):
+    for name in names:
+        value = os.environ.get(name)
+        if value is not None and value.strip():
+            return value
+    return default
+
+
+mail_server = env_first('MAIL_SERVER', 'SMTP_SERVER', 'SMTP_HOST', default='smtp.gmail.com').strip()
+mail_port = int(env_first('MAIL_PORT', 'SMTP_PORT', default='587'))
+mail_username = (env_first('MAIL_USERNAME', 'EMAIL_USER', 'EMAIL_USERNAME', 'SMTP_USERNAME') or '').strip()
+mail_password = (env_first('MAIL_PASSWORD', 'EMAIL_PASSWORD', 'EMAIL_PASS', 'SMTP_PASSWORD') or '').replace(' ', '').strip()
 mail_to = (os.environ.get('SMTP_TEST_TO') or mail_username).strip()
 
 missing = [
