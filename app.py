@@ -30,7 +30,6 @@ from datetime import datetime, timedelta
 import random
 import smtplib
 import ssl
-import threading
 from email.message import EmailMessage
 
 REACTION_MAP = {
@@ -125,12 +124,14 @@ app.config['ADMIN_EMAILS'] = {
     if email.strip()
 }
 
-# Show OTP on the verification page by default so Render/Gmail issues cannot block registration.
-app.config['SHOW_OTP'] = os.environ.get('SHOW_OTP', '1').strip().lower() in ('1', 'true', 'yes')
+# Only show OTP on-screen for local/debug testing. Production should deliver OTP by email.
+debug_enabled = os.environ.get('FLASK_DEBUG', '0').strip().lower() in ('1', 'true', 'yes')
+show_otp_requested = os.environ.get('SHOW_OTP', '0').strip().lower() in ('1', 'true', 'yes')
+app.config['SHOW_OTP'] = debug_enabled and show_otp_requested
 
 
 def should_show_otp(email_sent=False):
-    return app.config.get('SHOW_OTP', False) or not email_sent
+    return app.config.get('SHOW_OTP', False)
 
 
 def is_admin_user(user=None):
@@ -263,15 +264,6 @@ def send_email(to_addr, subject, body):
         return False
 
 
-def send_email_async(to_addr, subject, body):
-    def worker():
-        with app.app_context():
-            send_email(to_addr, subject, body)
-
-    thread = threading.Thread(target=worker, daemon=True)
-    thread.start()
-
-
 def mail_setup_message():
     mail_server = (app.config.get('MAIL_SERVER') or '').strip()
     mail_user = (app.config.get('MAIL_USERNAME') or '').strip()
@@ -286,12 +278,12 @@ def mail_setup_message():
         missing.append('MAIL_PASSWORD')
 
     if missing:
-        return 'OTP email could not be sent. Missing environment variables: ' + ', '.join(missing) + '. Use the OTP shown below to finish registration.'
+        return 'OTP email could not be sent. Missing environment variables: ' + ', '.join(missing) + '.'
 
     if mail_server == 'smtp.gmail.com' and len(mail_pass) != 16:
-        return 'OTP email could not be sent. Gmail needs a 16-character App Password, not your normal Gmail password. Use the OTP shown below to finish registration.'
+        return 'OTP email could not be sent. Gmail needs a 16-character App Password, not your normal Gmail password.'
 
-    return 'OTP email could not be sent. Check your MAIL environment variables. Use the OTP shown below to finish registration.'
+    return 'OTP email could not be sent. Check your MAIL environment variables.'
 
 os.makedirs(app.instance_path, exist_ok=True)
 database_url = os.environ.get('DATABASE_URL')
@@ -716,10 +708,13 @@ def register():
         pending['otp'] = otp
         pending['otp_ts'] = datetime.utcnow().timestamp()
 
-        send_email_async(email, 'Your registration OTP', f'Your OTP is: {otp}')
-        flash('Use the OTP shown below to finish registration. If email is configured correctly, it will also arrive in your inbox.')
+        email_sent = send_email(email, 'Your registration OTP', f'Your OTP is: {otp}')
+        if not email_sent:
+            flash(mail_setup_message())
+            return redirect(url_for('register'))
 
-        show_otp = should_show_otp(False)
+        flash('OTP sent to your email. Please check your inbox or spam folder.')
+        show_otp = should_show_otp(email_sent)
         pending['show_otp'] = show_otp
         session['pending_registration'] = pending
         otp_val = otp if show_otp else None
@@ -824,10 +819,13 @@ def resend_otp():
     data['otp_ts'] = datetime.utcnow().timestamp()
     session['pending_registration'] = data
 
-    send_email_async(data['email'], 'Your registration OTP (resend)', f'Your OTP is: {otp}')
-    flash('New OTP generated. Use the OTP shown below to finish registration.')
+    email_sent = send_email(data['email'], 'Your registration OTP (resend)', f'Your OTP is: {otp}')
+    if email_sent:
+        flash('OTP resent to your email. Please check your inbox or spam folder.')
+    else:
+        flash(mail_setup_message())
 
-    show_otp = should_show_otp(False)
+    show_otp = should_show_otp(email_sent)
     data['show_otp'] = show_otp
     session['pending_registration'] = data
     otp_val = otp if show_otp else None
