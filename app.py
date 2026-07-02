@@ -114,6 +114,11 @@ def env_first(*names, default=None):
     for name in names:
         value = os.environ.get(name)
         if value is not None and str(value).strip():
+            value = str(value).strip().strip('"').strip("'")
+            for env_name in names:
+                prefix = env_name + '='
+                if value.startswith(prefix):
+                    value = value[len(prefix):].strip().strip('"').strip("'")
             return value
     return default
 
@@ -173,9 +178,9 @@ def gmail_api_configured():
 
 def gmail_api_access_token():
     data = urllib.parse.urlencode({
-        'client_id': app.config['GMAIL_CLIENT_ID'],
-        'client_secret': app.config['GMAIL_CLIENT_SECRET'],
-        'refresh_token': app.config['GMAIL_REFRESH_TOKEN'],
+        'client_id': (app.config['GMAIL_CLIENT_ID'] or '').strip(),
+        'client_secret': (app.config['GMAIL_CLIENT_SECRET'] or '').strip(),
+        'refresh_token': (app.config['GMAIL_REFRESH_TOKEN'] or '').strip(),
         'grant_type': 'refresh_token',
     }).encode('utf-8')
     req = urllib.request.Request(
@@ -351,6 +356,12 @@ def send_email(to_addr, subject, body):
             except Exception:
                 pass
             if not mail_pass:
+                if 'invalid_client' in api_error:
+                    app.config['LAST_MAIL_ERROR'] = (
+                        'Gmail API client is invalid. Check GMAIL_CLIENT_ID and '
+                        'GMAIL_CLIENT_SECRET in your hosting environment variables.'
+                    )
+                    return False
                 app.config['LAST_MAIL_ERROR'] = 'Gmail API failed: ' + api_error
                 return False
 
