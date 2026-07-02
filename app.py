@@ -135,7 +135,7 @@ app.config['MAIL_USERNAME'] = env_first('MAIL_USERNAME', 'EMAIL_USER', 'EMAIL_US
 app.config['MAIL_PASSWORD'] = env_first('MAIL_PASSWORD', 'EMAIL_PASSWORD', 'EMAIL_PASS', 'SMTP_PASSWORD')
 app.config['MAIL_TIMEOUT'] = int(os.environ.get('MAIL_TIMEOUT', 8))
 app.config['LAST_MAIL_ERROR'] = ''
-app.config['OTP_FALLBACK_ON_MAIL_FAILURE'] = env_flag('OTP_FALLBACK_ON_MAIL_FAILURE', True)
+app.config['OTP_FALLBACK_ON_MAIL_FAILURE'] = env_flag('OTP_FALLBACK_ON_MAIL_FAILURE', False)
 app.config['ADMIN_EMAILS'] = {
     email.strip().lower()
     for email in os.environ.get('ADMIN_EMAILS', 'logananthan02@gmail.com').split(',')
@@ -151,7 +151,7 @@ app.config['SHOW_OTP'] = debug_enabled and show_otp_requested
 def should_show_otp(email_sent=False):
     if app.config.get('SHOW_OTP', False):
         return True
-    return (not email_sent) and app.config.get('OTP_FALLBACK_ON_MAIL_FAILURE', True)
+    return (not email_sent) and app.config.get('OTP_FALLBACK_ON_MAIL_FAILURE', False)
 
 
 def is_admin_user(user=None):
@@ -263,20 +263,38 @@ def send_email(to_addr, subject, body):
     msg['To'] = to_addr
     msg['Reply-To'] = mail_user
     context = ssl.create_default_context()
+
+    smtp_attempts = [(mail_server, mail_port)]
+    if mail_server == 'smtp.gmail.com':
+        alternate_gmail_port = 465 if mail_port != 465 else 587
+        smtp_attempts.append((mail_server, alternate_gmail_port))
+
     try:
-        # Choose SSL or STARTTLS based on port
-        if mail_port == 465:
-            with smtplib.SMTP_SSL(mail_server, mail_port, timeout=mail_timeout, context=context) as server:
-                server.ehlo()
-                server.login(mail_user, mail_pass)
-                server.send_message(msg)
-        else:
-            with smtplib.SMTP(mail_server, mail_port, timeout=mail_timeout) as server:
-                server.ehlo()
-                server.starttls(context=context)
-                server.ehlo()
-                server.login(mail_user, mail_pass)
-                server.send_message(msg)
+        last_error = None
+        for smtp_server, smtp_port in smtp_attempts:
+            try:
+                # Choose SSL or STARTTLS based on port.
+                if smtp_port == 465:
+                    with smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=mail_timeout, context=context) as server:
+                        server.ehlo()
+                        server.login(mail_user, mail_pass)
+                        server.send_message(msg)
+                else:
+                    with smtplib.SMTP(smtp_server, smtp_port, timeout=mail_timeout) as server:
+                        server.ehlo()
+                        server.starttls(context=context)
+                        server.ehlo()
+                        server.login(mail_user, mail_pass)
+                        server.send_message(msg)
+                last_error = None
+                break
+            except Exception as e:
+                last_error = e
+                print(f'Failed SMTP attempt via {smtp_server}:{smtp_port}:', e)
+
+        if last_error:
+            raise last_error
+
         # Log success
         try:
             with open(log_path, 'a', encoding='utf-8') as f:
