@@ -16,6 +16,7 @@
             <div class="nav-links">
                 {% if current_user.is_authenticated %}
                     <a href="{{ url_for('menu') }}" class="nav-link-btn">Menu</a>
+                    <a href="{{ url_for('post') }}" class="nav-link-btn">Publish</a>
                     <span class="nav-user">Hi, {{ current_user.username }}</span>
                     <a href="{{ url_for('logout') }}" class="nav-link-btn logout-btn">Logout</a>
                 {% endif %}
