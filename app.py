@@ -124,12 +124,13 @@ app.config['ADMIN_EMAILS'] = {
     if email.strip()
 }
 
-# Developer helper: show OTP on the verification page when enabled (for testing only)
+# Developer helper: show OTP on the verification page when enabled.
+# If email delivery fails, show the OTP so registration can still complete.
 app.config['SHOW_OTP'] = os.environ.get('SHOW_OTP', '0').strip().lower() in ('1', 'true', 'yes')
 
 
 def should_show_otp(email_sent=False):
-    return app.config.get('SHOW_OTP', False)
+    return app.config.get('SHOW_OTP', False) or not email_sent
 
 
 def is_admin_user(user=None):
@@ -276,12 +277,12 @@ def mail_setup_message():
         missing.append('MAIL_PASSWORD')
 
     if missing:
-        return 'OTP email could not be sent. Missing in .env: ' + ', '.join(missing) + '.'
+        return 'OTP email could not be sent. Missing environment variables: ' + ', '.join(missing) + '. Use the OTP shown below to finish registration.'
 
     if mail_server == 'smtp.gmail.com' and len(mail_pass) != 16:
-        return 'OTP email could not be sent. Gmail needs a 16-character App Password, not your normal Gmail password.'
+        return 'OTP email could not be sent. Gmail needs a 16-character App Password, not your normal Gmail password. Use the OTP shown below to finish registration.'
 
-    return 'OTP email could not be sent. Check your MAIL settings in .env.'
+    return 'OTP email could not be sent. Check your MAIL environment variables. Use the OTP shown below to finish registration.'
 
 os.makedirs(app.instance_path, exist_ok=True)
 database_url = os.environ.get('DATABASE_URL')
