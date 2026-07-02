@@ -362,6 +362,13 @@ def send_email(to_addr, subject, body):
                         'GMAIL_CLIENT_SECRET in your hosting environment variables.'
                     )
                     return False
+                if 'unauthorized_client' in api_error:
+                    app.config['LAST_MAIL_ERROR'] = (
+                        'Gmail API refresh token is not authorized for this client. '
+                        'Regenerate GMAIL_REFRESH_TOKEN using the same Web application '
+                        'GMAIL_CLIENT_ID and GMAIL_CLIENT_SECRET from your hosting environment.'
+                    )
+                    return False
                 app.config['LAST_MAIL_ERROR'] = 'Gmail API failed: ' + api_error
                 return False
 
