@@ -117,6 +117,7 @@ app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
 app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', 587))
 app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
 app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
+app.config['MAIL_TIMEOUT'] = int(os.environ.get('MAIL_TIMEOUT', 8))
 app.config['ADMIN_EMAILS'] = {
     email.strip().lower()
     for email in os.environ.get('ADMIN_EMAILS', 'logananthan02@gmail.com').split(',')
@@ -188,6 +189,7 @@ def send_email(to_addr, subject, body):
     mail_port = app.config.get('MAIL_PORT', 587)
     mail_user = (app.config.get('MAIL_USERNAME') or '').strip()
     mail_pass = (app.config.get('MAIL_PASSWORD') or '').replace(' ', '').strip()
+    mail_timeout = app.config.get('MAIL_TIMEOUT', 8)
 
     # Log OTP to instance/otp.log for debugging/audit
     try:
@@ -232,12 +234,12 @@ def send_email(to_addr, subject, body):
     try:
         # Choose SSL or STARTTLS based on port
         if mail_port == 465:
-            with smtplib.SMTP_SSL(mail_server, mail_port, context=context) as server:
+            with smtplib.SMTP_SSL(mail_server, mail_port, timeout=mail_timeout, context=context) as server:
                 server.ehlo()
                 server.login(mail_user, mail_pass)
                 server.send_message(msg)
         else:
-            with smtplib.SMTP(mail_server, mail_port) as server:
+            with smtplib.SMTP(mail_server, mail_port, timeout=mail_timeout) as server:
                 server.ehlo()
                 server.starttls(context=context)
                 server.ehlo()

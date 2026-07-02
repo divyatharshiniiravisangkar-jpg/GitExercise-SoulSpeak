@@ -26,6 +26,7 @@ MAIL_USERNAME=your-email@example.com
 MAIL_PASSWORD=your-email-app-password
 MAIL_SERVER=smtp.gmail.com
 MAIL_PORT=587
+MAIL_TIMEOUT=8
 FLASK_DEBUG=0
 ```
 
