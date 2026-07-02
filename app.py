@@ -118,6 +118,7 @@ app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', 587))
 app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
 app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
 app.config['MAIL_TIMEOUT'] = int(os.environ.get('MAIL_TIMEOUT', 8))
+app.config['LAST_MAIL_ERROR'] = ''
 app.config['ADMIN_EMAILS'] = {
     email.strip().lower()
     for email in os.environ.get('ADMIN_EMAILS', 'logananthan02@gmail.com').split(',')
@@ -187,6 +188,7 @@ def malaysia_time(value, fmt='%I:%M %p'):
 
 
 def send_email(to_addr, subject, body):
+    app.config['LAST_MAIL_ERROR'] = ''
     mail_server = (app.config.get('MAIL_SERVER') or '').strip()
     mail_port = app.config.get('MAIL_PORT', 587)
     mail_user = (app.config.get('MAIL_USERNAME') or '').strip()
@@ -203,11 +205,20 @@ def send_email(to_addr, subject, body):
         pass
 
     if not (mail_server and mail_user and mail_pass):
+        missing = []
+        if not mail_server:
+            missing.append('MAIL_SERVER')
+        if not mail_user:
+            missing.append('MAIL_USERNAME')
+        if not mail_pass:
+            missing.append('MAIL_PASSWORD')
+        app.config['LAST_MAIL_ERROR'] = 'Missing environment variables: ' + ', '.join(missing)
         print(f"OTP for {to_addr}: {body}")
         return False
 
     if mail_server == 'smtp.gmail.com' and len(mail_pass) != 16:
-        print('Failed to send email: Gmail App Password must be 16 characters')
+        app.config['LAST_MAIL_ERROR'] = 'Gmail App Password must be 16 characters'
+        print('Failed to send email:', app.config['LAST_MAIL_ERROR'])
         return False
 
     msg = EmailMessage()
@@ -255,6 +266,7 @@ def send_email(to_addr, subject, body):
             pass
         return True
     except Exception as e:
+        app.config['LAST_MAIL_ERROR'] = str(e)
         print('Failed to send email:', e)
         try:
             with open(log_path, 'a', encoding='utf-8') as f:
@@ -265,6 +277,10 @@ def send_email(to_addr, subject, body):
 
 
 def mail_setup_message():
+    last_error = (app.config.get('LAST_MAIL_ERROR') or '').strip()
+    if last_error:
+        return 'OTP email could not be sent: ' + last_error + '.'
+
     mail_server = (app.config.get('MAIL_SERVER') or '').strip()
     mail_user = (app.config.get('MAIL_USERNAME') or '').strip()
     mail_pass = (app.config.get('MAIL_PASSWORD') or '').replace(' ', '').strip()
