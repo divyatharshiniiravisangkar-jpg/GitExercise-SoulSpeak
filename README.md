@@ -38,6 +38,26 @@ For Gmail, `MAIL_PASSWORD` must be a 16-character Gmail App Password, not your n
 
 Keep `OTP_FALLBACK_ON_MAIL_FAILURE=0` when you want OTPs to be email-only.
 
+If the published app says `[Errno 101] Network is unreachable`, the hosting platform is blocking Gmail SMTP. Use Gmail API instead by adding these environment variables:
+
+```text
+MAIL_USERNAME=your-gmail@gmail.com
+GMAIL_CLIENT_ID=your-google-oauth-client-id
+GMAIL_CLIENT_SECRET=your-google-oauth-client-secret
+GMAIL_REFRESH_TOKEN=your-google-oauth-refresh-token
+SHOW_OTP=0
+FLASK_DEBUG=0
+OTP_FALLBACK_ON_MAIL_FAILURE=0
+```
+
+When Gmail API variables are present, the app sends OTP email through Gmail over HTTPS before trying SMTP.
+
+To test Gmail API locally after setting the variables:
+
+```bash
+python gmail_api_test.py
+```
+
 ## Run Locally
 
 ```bash

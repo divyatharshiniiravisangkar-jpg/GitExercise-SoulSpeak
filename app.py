@@ -27,9 +27,14 @@ import uuid
 from flask_login import current_user
 
 from datetime import datetime, timedelta
+import base64
+import json
 import random
 import smtplib
 import ssl
+import urllib.error
+import urllib.parse
+import urllib.request
 from email.message import EmailMessage
 
 REACTION_MAP = {
@@ -136,6 +141,9 @@ app.config['MAIL_PASSWORD'] = env_first('MAIL_PASSWORD', 'EMAIL_PASSWORD', 'EMAI
 app.config['MAIL_TIMEOUT'] = int(os.environ.get('MAIL_TIMEOUT', 8))
 app.config['LAST_MAIL_ERROR'] = ''
 app.config['OTP_FALLBACK_ON_MAIL_FAILURE'] = env_flag('OTP_FALLBACK_ON_MAIL_FAILURE', False)
+app.config['GMAIL_CLIENT_ID'] = env_first('GMAIL_CLIENT_ID', 'GOOGLE_CLIENT_ID')
+app.config['GMAIL_CLIENT_SECRET'] = env_first('GMAIL_CLIENT_SECRET', 'GOOGLE_CLIENT_SECRET')
+app.config['GMAIL_REFRESH_TOKEN'] = env_first('GMAIL_REFRESH_TOKEN', 'GOOGLE_REFRESH_TOKEN')
 app.config['ADMIN_EMAILS'] = {
     email.strip().lower()
     for email in os.environ.get('ADMIN_EMAILS', 'logananthan02@gmail.com').split(',')
@@ -152,6 +160,56 @@ def should_show_otp(email_sent=False):
     if app.config.get('SHOW_OTP', False):
         return True
     return (not email_sent) and app.config.get('OTP_FALLBACK_ON_MAIL_FAILURE', False)
+
+
+def gmail_api_configured():
+    return all((
+        (app.config.get('GMAIL_CLIENT_ID') or '').strip(),
+        (app.config.get('GMAIL_CLIENT_SECRET') or '').strip(),
+        (app.config.get('GMAIL_REFRESH_TOKEN') or '').strip(),
+        (app.config.get('MAIL_USERNAME') or '').strip(),
+    ))
+
+
+def gmail_api_access_token():
+    data = urllib.parse.urlencode({
+        'client_id': app.config['GMAIL_CLIENT_ID'],
+        'client_secret': app.config['GMAIL_CLIENT_SECRET'],
+        'refresh_token': app.config['GMAIL_REFRESH_TOKEN'],
+        'grant_type': 'refresh_token',
+    }).encode('utf-8')
+    req = urllib.request.Request(
+        'https://oauth2.googleapis.com/token',
+        data=data,
+        headers={'Content-Type': 'application/x-www-form-urlencoded'},
+        method='POST',
+    )
+
+    with urllib.request.urlopen(req, timeout=20) as response:
+        payload = json.loads(response.read().decode('utf-8'))
+
+    token = payload.get('access_token')
+    if not token:
+        raise RuntimeError('Gmail API did not return an access token')
+    return token
+
+
+def send_gmail_api_message(msg):
+    token = gmail_api_access_token()
+    raw = base64.urlsafe_b64encode(msg.as_bytes()).decode('ascii')
+    data = json.dumps({'raw': raw}).encode('utf-8')
+    req = urllib.request.Request(
+        'https://gmail.googleapis.com/gmail/v1/users/me/messages/send',
+        data=data,
+        headers={
+            'Authorization': f'Bearer {token}',
+            'Content-Type': 'application/json',
+        },
+        method='POST',
+    )
+
+    with urllib.request.urlopen(req, timeout=20) as response:
+        return json.loads(response.read().decode('utf-8'))
 
 
 def is_admin_user(user=None):
@@ -213,6 +271,7 @@ def send_email(to_addr, subject, body):
     mail_user = (app.config.get('MAIL_USERNAME') or '').strip()
     mail_pass = (app.config.get('MAIL_PASSWORD') or '').replace(' ', '').strip()
     mail_timeout = app.config.get('MAIL_TIMEOUT', 8)
+    use_gmail_api = gmail_api_configured()
 
     # Log OTP to instance/otp.log for debugging/audit
     try:
@@ -223,19 +282,24 @@ def send_email(to_addr, subject, body):
     except Exception:
         pass
 
-    if not (mail_server and mail_user and mail_pass):
+    if not mail_user:
+        missing = []
+        missing.append('MAIL_USERNAME')
+        app.config['LAST_MAIL_ERROR'] = 'Missing environment variables: ' + ', '.join(missing)
+        print(f"OTP for {to_addr}: {body}")
+        return False
+
+    if not use_gmail_api and not (mail_server and mail_pass):
         missing = []
         if not mail_server:
             missing.append('MAIL_SERVER')
-        if not mail_user:
-            missing.append('MAIL_USERNAME')
         if not mail_pass:
             missing.append('MAIL_PASSWORD')
         app.config['LAST_MAIL_ERROR'] = 'Missing environment variables: ' + ', '.join(missing)
         print(f"OTP for {to_addr}: {body}")
         return False
 
-    if mail_server == 'smtp.gmail.com' and len(mail_pass) != 16:
+    if not use_gmail_api and mail_server == 'smtp.gmail.com' and len(mail_pass) != 16:
         app.config['LAST_MAIL_ERROR'] = 'Gmail App Password must be 16 characters'
         print('Failed to send email:', app.config['LAST_MAIL_ERROR'])
         return False
@@ -263,6 +327,32 @@ def send_email(to_addr, subject, body):
     msg['To'] = to_addr
     msg['Reply-To'] = mail_user
     context = ssl.create_default_context()
+
+    if use_gmail_api:
+        try:
+            send_gmail_api_message(msg)
+            try:
+                with open(log_path, 'a', encoding='utf-8') as f:
+                    f.write(f"{datetime.utcnow().isoformat()} SENT_GMAIL_API {to_addr} {subject}\n")
+            except Exception:
+                pass
+            return True
+        except Exception as e:
+            api_error = str(e)
+            if isinstance(e, urllib.error.HTTPError):
+                try:
+                    api_error = e.read().decode('utf-8')
+                except Exception:
+                    api_error = str(e)
+            print('Failed Gmail API send:', api_error)
+            try:
+                with open(log_path, 'a', encoding='utf-8') as f:
+                    f.write(f"{datetime.utcnow().isoformat()} FAILED_GMAIL_API {to_addr} {subject} {api_error}\n")
+            except Exception:
+                pass
+            if not mail_pass:
+                app.config['LAST_MAIL_ERROR'] = 'Gmail API failed: ' + api_error
+                return False
 
     smtp_attempts = [(mail_server, mail_port)]
     if mail_server == 'smtp.gmail.com':
@@ -321,19 +411,20 @@ def mail_setup_message():
     mail_server = (app.config.get('MAIL_SERVER') or '').strip()
     mail_user = (app.config.get('MAIL_USERNAME') or '').strip()
     mail_pass = (app.config.get('MAIL_PASSWORD') or '').replace(' ', '').strip()
+    use_gmail_api = gmail_api_configured()
 
     missing = []
-    if not mail_server:
-        missing.append('MAIL_SERVER')
     if not mail_user:
         missing.append('MAIL_USERNAME')
-    if not mail_pass:
+    if not use_gmail_api and not mail_server:
+        missing.append('MAIL_SERVER')
+    if not use_gmail_api and not mail_pass:
         missing.append('MAIL_PASSWORD')
 
     if missing:
         return 'OTP email could not be sent. Missing environment variables: ' + ', '.join(missing) + '.'
 
-    if mail_server == 'smtp.gmail.com' and len(mail_pass) != 16:
+    if not use_gmail_api and mail_server == 'smtp.gmail.com' and len(mail_pass) != 16:
         return 'OTP email could not be sent. Gmail needs a 16-character App Password, not your normal Gmail password.'
 
     return 'OTP email could not be sent. Check your MAIL environment variables.'
