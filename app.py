@@ -11,6 +11,7 @@ from flask import url_for
 from flask import flash
 from flask import session
 from flask import jsonify
+from flask import send_from_directory
 
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import inspect, text
@@ -447,25 +448,93 @@ def mail_setup_message():
 
     return 'OTP email could not be sent. Check your MAIL environment variables.'
 
-os.makedirs(app.instance_path, exist_ok=True)
-database_url = os.environ.get('DATABASE_URL')
+
+def database_uri_from_env():
+    database_url = env_first('DATABASE_URL', 'POSTGRES_URL', 'POSTGRESQL_URL')
+    if database_url:
+        if database_url.startswith('postgres://'):
+            database_url = database_url.replace('postgres://', 'postgresql://', 1)
+        return database_url, False
+
+    persistent_path = env_first('RENDER_DISK_PATH', 'PERSISTENT_STORAGE_PATH', 'DATA_DIR')
+    if persistent_path:
+        os.makedirs(persistent_path, exist_ok=True)
+        return f"sqlite:///{os.path.join(persistent_path, 'database.db')}", False
+
+    os.makedirs(app.instance_path, exist_ok=True)
+    return f"sqlite:///{os.path.join(app.instance_path, 'database.db')}", True
+
+
+def persistent_storage_path():
+    return env_first('RENDER_DISK_PATH', 'PERSISTENT_STORAGE_PATH', 'DATA_DIR')
+
+
+def table_columns(table_name):
+    inspector = inspect(db.engine)
+    if not inspector.has_table(table_name):
+        return set()
+    return {column['name'] for column in inspector.get_columns(table_name)}
+
+
+def sql_table_name(table_name):
+    if db.engine.dialect.name == 'sqlite':
+        return table_name
+    return f'"{table_name}"'
+
+
+def sql_datetime_type():
+    if db.engine.dialect.name == 'sqlite':
+        return 'DATETIME'
+    return 'TIMESTAMP'
+
+
+database_uri, using_ephemeral_sqlite = database_uri_from_env()
+app.config['USING_EPHEMERAL_SQLITE'] = using_ephemeral_sqlite
+if using_ephemeral_sqlite:
+    print(
+        'WARNING: DATABASE_URL is not set. Published data may disappear when '
+        'the hosting service restarts or redeploys. Use a persistent PostgreSQL '
+        'DATABASE_URL for production.'
+    )
+
+database_url = database_uri
 if database_url:
     if database_url.startswith('postgres://'):
         database_url = database_url.replace('postgres://', 'postgresql://', 1)
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-else:
-    app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(app.instance_path, 'database.db')}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
-UPLOAD_FOLDER = os.path.join(app.static_folder, 'uploads')
+storage_path = persistent_storage_path()
+if storage_path:
+    UPLOAD_FOLDER = os.path.join(storage_path, 'uploads')
+else:
+    UPLOAD_FOLDER = os.path.join(app.static_folder, 'uploads')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+@app.route('/uploads/<path:filename>')
+def uploaded_file(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+
+def post_image_url(image_path):
+    if image_path and image_path.startswith('uploads/'):
+        return url_for('uploaded_file', filename=image_path.split('/', 1)[1])
+    if image_path:
+        return url_for('static', filename=image_path)
+    return ''
+
+
+@app.context_processor
+def inject_upload_helpers():
+    return {'post_image_url': post_image_url}
 
 
 def sentiment_label_for_score(score):
@@ -733,29 +802,27 @@ def init_db():
         db.create_all()
         inspector = inspect(db.engine)
         if inspector.has_table('chat'):
-            result = db.session.execute(text("PRAGMA table_info(chat)"))
-            columns = [row[1] for row in result]
+            columns = table_columns('chat')
             if 'user_id' not in columns:
-                db.session.execute(text('ALTER TABLE chat ADD COLUMN user_id INTEGER'))
+                db.session.execute(text(f'ALTER TABLE {sql_table_name("chat")} ADD COLUMN user_id INTEGER'))
             if 'recipient' not in columns:
-                db.session.execute(text("ALTER TABLE chat ADD COLUMN recipient VARCHAR(100) NOT NULL DEFAULT 'Admin'"))
+                db.session.execute(text(f"ALTER TABLE {sql_table_name('chat')} ADD COLUMN recipient VARCHAR(100) NOT NULL DEFAULT 'Admin'"))
             if 'reply_to' not in columns:
-                db.session.execute(text('ALTER TABLE chat ADD COLUMN reply_to INTEGER'))
+                db.session.execute(text(f'ALTER TABLE {sql_table_name("chat")} ADD COLUMN reply_to INTEGER'))
             if 'created_at' not in columns:
-                db.session.execute(text('ALTER TABLE chat ADD COLUMN created_at DATETIME'))
+                db.session.execute(text(f'ALTER TABLE {sql_table_name("chat")} ADD COLUMN created_at {sql_datetime_type()}'))
             db.session.commit()
 
         if inspector.has_table('post'):
-            result = db.session.execute(text("PRAGMA table_info(post)"))
-            columns = [row[1] for row in result]
+            columns = table_columns('post')
             if 'image_path' not in columns:
-                db.session.execute(text("ALTER TABLE post ADD COLUMN image_path VARCHAR(255)"))
+                db.session.execute(text(f"ALTER TABLE {sql_table_name('post')} ADD COLUMN image_path VARCHAR(255)"))
             if 'sentiment_score' not in columns:
-                db.session.execute(text("ALTER TABLE post ADD COLUMN sentiment_score FLOAT NOT NULL DEFAULT 0.0"))
+                db.session.execute(text(f"ALTER TABLE {sql_table_name('post')} ADD COLUMN sentiment_score FLOAT NOT NULL DEFAULT 0.0"))
             if 'sentiment_label' not in columns:
-                db.session.execute(text("ALTER TABLE post ADD COLUMN sentiment_label VARCHAR(30) NOT NULL DEFAULT 'Neutral'"))
+                db.session.execute(text(f"ALTER TABLE {sql_table_name('post')} ADD COLUMN sentiment_label VARCHAR(30) NOT NULL DEFAULT 'Neutral'"))
             if 'created_at' not in columns:
-                db.session.execute(text("ALTER TABLE post ADD COLUMN created_at DATETIME"))
+                db.session.execute(text(f"ALTER TABLE {sql_table_name('post')} ADD COLUMN created_at {sql_datetime_type()}"))
             db.session.commit()
 
 init_db()
@@ -788,12 +855,11 @@ def repair_chat_user_ids():
 
 def ensure_user_columns():
     with app.app_context():
-        inspector = db.session.execute(text("PRAGMA table_info('user')"))
-        cols = [row[1] for row in inspector]
+        cols = table_columns('user')
         if 'security_question' not in cols:
-            db.session.execute(text("ALTER TABLE user ADD COLUMN security_question VARCHAR(255)"))
+            db.session.execute(text(f"ALTER TABLE {sql_table_name('user')} ADD COLUMN security_question VARCHAR(255)"))
         if 'security_answer' not in cols:
-            db.session.execute(text("ALTER TABLE user ADD COLUMN security_answer VARCHAR(255)"))
+            db.session.execute(text(f"ALTER TABLE {sql_table_name('user')} ADD COLUMN security_answer VARCHAR(255)"))
         db.session.commit()
 
 # ==========================================
@@ -1284,7 +1350,10 @@ def delete_post(post_id):
     db.session.commit()
 
     if image_path:
-        full_path = os.path.join(app.static_folder, image_path.replace('/', os.sep))
+        if image_path.startswith('uploads/'):
+            full_path = os.path.join(app.config['UPLOAD_FOLDER'], image_path.split('/', 1)[1])
+        else:
+            full_path = os.path.join(app.static_folder, image_path.replace('/', os.sep))
         if os.path.isfile(full_path):
             os.remove(full_path)
 

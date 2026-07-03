@@ -34,6 +34,16 @@ OTP_FALLBACK_ON_MAIL_FAILURE=0
 
 If `DATABASE_URL` is not set, the app uses local SQLite at `instance/database.db`, which is only suitable for local testing or a small demo.
 
+For a published app, set `DATABASE_URL` to a hosted PostgreSQL database. Otherwise users, posts, diary entries, and chat messages can disappear when the hosting service restarts, sleeps, or redeploys. If your host provides a persistent disk instead, set one of these to the disk path so SQLite and uploads are stored there:
+
+```text
+RENDER_DISK_PATH=/path/from/your/host
+PERSISTENT_STORAGE_PATH=/path/from/your/host
+DATA_DIR=/path/from/your/host
+```
+
+PostgreSQL with `DATABASE_URL` is the recommended production option.
+
 For Gmail, `MAIL_PASSWORD` must be a 16-character Gmail App Password, not your normal Gmail password. The app also accepts common SMTP aliases such as `EMAIL_USER`, `EMAIL_PASSWORD`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_SERVER`, and `SMTP_PORT`. If port `587` is unreachable, the app automatically retries Gmail on port `465`.
 
 Keep `OTP_FALLBACK_ON_MAIL_FAILURE=0` when you want OTPs to be email-only.

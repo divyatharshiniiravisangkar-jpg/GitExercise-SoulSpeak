@@ -55,7 +55,7 @@
 
                             {% if item.post.image_path %}
                                 <div class="post-image-wrap">
-                                    <img src="{{ url_for('static', filename=item.post.image_path) }}" alt="Post image" class="post-image">
+                                    <img src="{{ post_image_url(item.post.image_path) }}" alt="Post image" class="post-image">
                                 </div>
                             {% endif %}
 
