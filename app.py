@@ -12,6 +12,7 @@ from flask import flash
 from flask import session
 from flask import jsonify
 from flask import send_from_directory
+from flask import abort
 
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import inspect, text
@@ -37,6 +38,12 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from email.message import EmailMessage
+
+try:
+    import cloudinary
+    import cloudinary.uploader
+except ImportError:
+    cloudinary = None
 
 REACTION_MAP = {
     'love': 6,
@@ -519,22 +526,185 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
+def cloudinary_configured():
+    if cloudinary is None:
+        return False
+
+    cloudinary_url = env_first('CLOUDINARY_URL')
+    cloud_name = env_first('CLOUDINARY_CLOUD_NAME')
+    api_key = env_first('CLOUDINARY_API_KEY')
+    api_secret = env_first('CLOUDINARY_API_SECRET')
+
+    if cloudinary_url:
+        cloudinary.config(secure=True)
+        return True
+
+    if cloud_name and api_key and api_secret:
+        cloudinary.config(
+            cloud_name=cloud_name,
+            api_key=api_key,
+            api_secret=api_secret,
+            secure=True
+        )
+        return True
+
+    return False
+
+
+def cloudinary_image_parts(image_path):
+    if not image_path or not image_path.startswith('cloudinary:'):
+        return '', ''
+
+    value = image_path.split(':', 1)[1]
+    if '|' not in value:
+        return '', value
+
+    public_id, image_url = value.split('|', 1)
+    return public_id, image_url
+
+
+def cloudinary_upload_image(image, image_id):
+    if not cloudinary_configured():
+        return None
+
+    image.stream.seek(0)
+    result = cloudinary.uploader.upload(
+        image.stream,
+        folder='soulspeak_posts',
+        public_id=image_id,
+        resource_type='image',
+        overwrite=False
+    )
+    saved_public_id = result.get('public_id') or f'soulspeak_posts/{image_id}'
+    secure_url = result.get('secure_url') or result.get('url')
+    if not secure_url:
+        raise RuntimeError('Cloudinary did not return an image URL.')
+    return f"cloudinary:{saved_public_id}|{secure_url}"
+
+
+def save_post_image(image):
+    image_id = uuid.uuid4().hex
+
+    try:
+        cloudinary_path = cloudinary_upload_image(image, image_id)
+        if cloudinary_path:
+            return cloudinary_path, None
+    except Exception:
+        pass
+
+    mimetype = image.mimetype or 'image/jpeg'
+    image.stream.seek(0)
+    encoded_image = base64.b64encode(image.read()).decode('ascii')
+    return f"database:{image_id}", f"data:{mimetype};base64,{encoded_image}"
+
+
+def post_image_values(image_source):
+    if hasattr(image_source, 'image_path'):
+        return image_source.image_path, getattr(image_source, 'image_data', None)
+
+    return image_source, None
+
+
+def delete_post_image_file(image_path):
+    if not image_path:
+        return
+
+    public_id, _ = cloudinary_image_parts(image_path)
+    if public_id and cloudinary_configured():
+        cloudinary.uploader.destroy(public_id, resource_type='image')
+        return
+
+    upload_filename = upload_filename_from_path(image_path)
+    if upload_filename:
+        candidate_paths = [
+            os.path.join(folder, upload_filename)
+            for folder in upload_search_folders()
+        ]
+    else:
+        candidate_paths = [
+            os.path.join(app.static_folder, image_path.replace('/', os.sep))
+        ]
+
+    for full_path in candidate_paths:
+        if os.path.isfile(full_path):
+            os.remove(full_path)
+            return
+
+
 @app.route('/uploads/<path:filename>')
 def uploaded_file(filename):
-    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+    for folder in upload_search_folders():
+        if os.path.isfile(os.path.join(folder, filename)):
+            return send_from_directory(folder, filename)
+
+    abort(404)
+
+
+def upload_search_folders():
+    folders = [app.config['UPLOAD_FOLDER']]
+    static_uploads = os.path.join(app.static_folder, 'uploads')
+    if static_uploads not in folders:
+        folders.append(static_uploads)
+    return folders
+
+
+def upload_filename_from_path(image_path):
+    if not image_path:
+        return ''
+
+    normalized_path = image_path.replace('\\', '/')
+    if normalized_path.startswith('uploads/'):
+        return normalized_path.split('/', 1)[1]
+    if normalized_path.startswith('static/uploads/'):
+        return normalized_path.split('/', 2)[2]
+    return ''
 
 
 def post_image_url(image_path):
-    if image_path and image_path.startswith('uploads/'):
-        return url_for('uploaded_file', filename=image_path.split('/', 1)[1])
+    image_path, image_data = post_image_values(image_path)
+    if image_path and image_path.startswith('database:'):
+        return image_data or ''
+
+    _, cloudinary_url = cloudinary_image_parts(image_path)
+    if cloudinary_url:
+        return cloudinary_url
+
+    upload_filename = upload_filename_from_path(image_path)
+    if upload_filename:
+        return url_for('uploaded_file', filename=upload_filename)
     if image_path:
         return url_for('static', filename=image_path)
     return ''
 
 
+def post_image_exists(image_path):
+    image_path, image_data = post_image_values(image_path)
+    if image_path and image_path.startswith('database:'):
+        return bool(image_data)
+
+    _, cloudinary_url = cloudinary_image_parts(image_path)
+    if cloudinary_url:
+        return True
+
+    upload_filename = upload_filename_from_path(image_path)
+    if upload_filename:
+        return any(
+            os.path.isfile(os.path.join(folder, upload_filename))
+            for folder in upload_search_folders()
+        )
+
+    if image_path:
+        return os.path.isfile(os.path.join(app.static_folder, image_path.replace('/', os.sep)))
+
+    return False
+
+
 @app.context_processor
 def inject_upload_helpers():
-    return {'post_image_url': post_image_url}
+    return {
+        'post_image_url': post_image_url,
+        'post_image_exists': post_image_exists
+    }
 
 
 def sentiment_label_for_score(score):
@@ -627,6 +797,11 @@ class Post(db.Model):
 
     image_path = db.Column(
         db.String(255),
+        nullable=True
+    )
+
+    image_data = db.Column(
+        db.Text,
         nullable=True
     )
 
@@ -817,6 +992,8 @@ def init_db():
             columns = table_columns('post')
             if 'image_path' not in columns:
                 db.session.execute(text(f"ALTER TABLE {sql_table_name('post')} ADD COLUMN image_path VARCHAR(255)"))
+            if 'image_data' not in columns:
+                db.session.execute(text(f"ALTER TABLE {sql_table_name('post')} ADD COLUMN image_data TEXT"))
             if 'sentiment_score' not in columns:
                 db.session.execute(text(f"ALTER TABLE {sql_table_name('post')} ADD COLUMN sentiment_score FLOAT NOT NULL DEFAULT 0.0"))
             if 'sentiment_label' not in columns:
@@ -1212,15 +1389,16 @@ def post():
         content = request.form['content']
         image = request.files.get('image')
         image_path = None
+        image_data = None
         user_id = current_user.id if current_user.is_authenticated else None
 
         if image and image.filename:
             if allowed_file(image.filename):
-                filename = secure_filename(image.filename)
-                unique_filename = f"{uuid.uuid4().hex}_{filename}"
-                full_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
-                image.save(full_path)
-                image_path = f"uploads/{unique_filename}"
+                try:
+                    image_path, image_data = save_post_image(image)
+                except Exception:
+                    flash('Image upload failed. Please try again.')
+                    return redirect(url_for('post'))
             else:
                 flash('Only PNG, JPG, JPEG and GIF files are allowed')
                 return redirect(url_for('post'))
@@ -1228,6 +1406,7 @@ def post():
         new_post = Post(
             content=content,
             image_path=image_path,
+            image_data=image_data,
             user_id=user_id
         )
 
@@ -1349,13 +1528,7 @@ def delete_post(post_id):
     db.session.delete(post)
     db.session.commit()
 
-    if image_path:
-        if image_path.startswith('uploads/'):
-            full_path = os.path.join(app.config['UPLOAD_FOLDER'], image_path.split('/', 1)[1])
-        else:
-            full_path = os.path.join(app.static_folder, image_path.replace('/', os.sep))
-        if os.path.isfile(full_path):
-            os.remove(full_path)
+    delete_post_image_file(image_path)
 
     flash('Post deleted')
     return redirect(url_for('dashboard'))

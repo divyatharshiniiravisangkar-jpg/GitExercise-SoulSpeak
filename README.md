@@ -44,6 +44,20 @@ DATA_DIR=/path/from/your/host
 
 PostgreSQL with `DATABASE_URL` is the recommended production option.
 
+## Permanent Image Uploads
+
+Render free services do not keep uploaded files after restarts or redeploys. To make post images stay, create a free Cloudinary account and add these environment variables on Render:
+
+```text
+CLOUDINARY_CLOUD_NAME=your-cloudinary-cloud-name
+CLOUDINARY_API_KEY=your-cloudinary-api-key
+CLOUDINARY_API_SECRET=your-cloudinary-api-secret
+```
+
+When these variables are set, new post images are uploaded to Cloudinary and the app stores the Cloudinary image URL in the database.
+
+If Cloudinary is not configured, the app stores new uploaded images directly in the database so they do not depend on Render's temporary file system. For production, keep using a persistent `DATABASE_URL` so posts and their database-stored images survive redeploys.
+
 For Gmail, `MAIL_PASSWORD` must be a 16-character Gmail App Password, not your normal Gmail password. The app also accepts common SMTP aliases such as `EMAIL_USER`, `EMAIL_PASSWORD`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_SERVER`, and `SMTP_PORT`. If port `587` is unreachable, the app automatically retries Gmail on port `465`.
 
 Keep `OTP_FALLBACK_ON_MAIL_FAILURE=0` when you want OTPs to be email-only.

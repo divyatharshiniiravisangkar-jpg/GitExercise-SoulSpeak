@@ -1,4 +1,6 @@
 import unittest
+from io import BytesIO
+from unittest.mock import patch
 
 from app import app, db, User, Chat, Diary, Post
 
@@ -75,6 +77,91 @@ class ChatReplyTestCase(unittest.TestCase):
         self.assertEqual(first_response.status_code, 302)
         self.assertEqual(second_response.status_code, 302)
         self.assertEqual(Post.query.filter_by(content='One photo post').count(), 1)
+
+    def test_dashboard_skips_missing_post_image_file(self):
+        post = Post(
+            content='Photo file disappeared',
+            image_path='uploads/missing-photo.jpg',
+            user_id=self.user.id
+        )
+        db.session.add(post)
+        db.session.commit()
+
+        response = self.client.get('/dashboard')
+
+        self.assertEqual(response.status_code, 200)
+        page = response.get_data(as_text=True)
+        self.assertIn('Photo file disappeared', page)
+        self.assertNotIn('missing-photo.jpg', page)
+
+    def test_dashboard_shows_cloudinary_post_image(self):
+        post = Post(
+            content='Cloud photo',
+            image_path='cloudinary:soulspeak_posts/photo|https://res.cloudinary.com/demo/image/upload/photo.jpg',
+            user_id=self.user.id
+        )
+        db.session.add(post)
+        db.session.commit()
+
+        response = self.client.get('/dashboard')
+
+        self.assertEqual(response.status_code, 200)
+        page = response.get_data(as_text=True)
+        self.assertIn('Cloud photo', page)
+        self.assertIn('https://res.cloudinary.com/demo/image/upload/photo.jpg', page)
+
+    def test_post_upload_uses_cloudinary_when_configured(self):
+        with self.client.session_transaction() as session:
+            session['_user_id'] = str(self.user.id)
+            session['_fresh'] = True
+            session['post_tokens'] = ['cloud-token']
+
+        with patch(
+            'app.cloudinary_upload_image',
+            return_value='cloudinary:soulspeak_posts/cloud-photo|https://res.cloudinary.com/demo/image/upload/cloud-photo.jpg'
+        ):
+            response = self.client.post(
+                '/post',
+                data={
+                    'content': 'Cloud uploaded post',
+                    'post_token': 'cloud-token',
+                    'image': (BytesIO(b'fake image bytes'), 'photo.jpg')
+                },
+                content_type='multipart/form-data',
+                follow_redirects=False
+            )
+
+        self.assertEqual(response.status_code, 302)
+        post = Post.query.filter_by(content='Cloud uploaded post').one()
+        self.assertTrue(post.image_path.startswith('cloudinary:soulspeak_posts/cloud-photo|'))
+        self.assertIn('https://res.cloudinary.com/demo/image/upload/cloud-photo.jpg', post.image_path)
+
+    def test_post_upload_stores_image_in_database_without_cloudinary(self):
+        with self.client.session_transaction() as session:
+            session['_user_id'] = str(self.user.id)
+            session['_fresh'] = True
+            session['post_tokens'] = ['database-image-token']
+
+        with patch('app.cloudinary_upload_image', return_value=None):
+            response = self.client.post(
+                '/post',
+                data={
+                    'content': 'Database image post',
+                    'post_token': 'database-image-token',
+                    'image': (BytesIO(b'fake image bytes'), 'photo.jpg')
+                },
+                content_type='multipart/form-data',
+                follow_redirects=False
+            )
+
+        self.assertEqual(response.status_code, 302)
+        post = Post.query.filter_by(content='Database image post').one()
+        self.assertTrue(post.image_path.startswith('database:'))
+        self.assertTrue(post.image_data.startswith('data:image/'))
+
+        dashboard = self.client.get('/dashboard').get_data(as_text=True)
+        self.assertIn('Database image post', dashboard)
+        self.assertIn('data:image/', dashboard)
 
     def test_admin_chat_shows_user_picker_and_selected_thread(self):
         bob = User(username='bob', email='bob@example.com', password='pw')

@@ -113,9 +113,9 @@
                             <p class="sentiment-caption">{{ item.post.content }}</p>
                         {% endif %}
 
-                        {% if item.post.image_path %}
+                        {% if post_image_exists(item.post) %}
                             <div class="sentiment-image-wrap">
-                                <img src="{{ post_image_url(item.post.image_path) }}" alt="Post image">
+                                <img src="{{ post_image_url(item.post) }}" alt="Post image">
                             </div>
                         {% endif %}
 
